@@ -1,2 +1,9 @@
 [workspace]
 members = [ "cli", "inject" ]
+exclude = ["redhook"]
+
+[profile.release]
+opt-level = "s" # optimize for binary size
+lto = true
+codegen-units = 1
+panic = "abort" # disable backtraces on panic
