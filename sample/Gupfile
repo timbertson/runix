@@ -1,0 +1,2 @@
+./convert-macos.sh:
+	macos/nix/store/*

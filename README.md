@@ -23,6 +23,22 @@ Hooking:
  - only need _read_ syscalls, which should be much simpler than e.g. `proot` easy. Any mutating syscall is allowed to fail, since they shouldn't be called.
    - if we wanna be fancy we could EPERM modification syscalls when accessing /nix, but it's probably not necesary
 
+# Modifications made to files
+
+patchelf / install_name tool is used to modify native executables.
+
+Since it's not always possible to expand a file, we alter `/nix/store` to `/tmp/runix`.
+
+# Environment where binaries are run
+
+`runix` performs setup before running a binary:
+
+ - ensures /tmp/runix is a symlink to the actual store path $RUNIX_ROOT/nix/store (typically ~/.cache/runix/nix/store)
+   - This is required for dynamic linking of libraries (see ./modifications.md)
+ - sets LD_PRELOAD or DYLD_INSERT_LIBRARIES to inject librunix_inject.{so,dylib} into the process.
+   - This will intercept all file-related libc calls and prefix any instance of /nix/store with $RUNIX_ROOT before running the underlying call.
+ - adds the directory of the executable to be run to the beginning of $PATH
+
 # Roadmap / features in order of urgency:
 
 Extremely vague and imaginary...

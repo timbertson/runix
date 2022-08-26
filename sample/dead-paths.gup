@@ -1,0 +1,2 @@
+#!bash -eu
+nix-store --gc --print-dead > "$1"

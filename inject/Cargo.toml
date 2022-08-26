@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["dylib"] # TODO should be cdylib
+crate-type = ["dylib"] # TODO should be cdylib, see https://github.com/geofft/redhook/issues/8
 
 [dependencies]
 redhook = "2.0"

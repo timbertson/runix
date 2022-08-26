@@ -1,0 +1,3 @@
+#!bash -eu
+gup --always
+ls -1 ../candidate-store | sed -e 's|^|nix/store/|' | xargs gup -u

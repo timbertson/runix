@@ -1,0 +1,27 @@
+#!/usr/bin/env fish
+gup -u dead-paths
+
+chmod -R +w candidate-store
+rm -rf candidate-store
+mkdir -p candidate-store
+
+# find a dead path with a lib dir
+for lib in (cat dead-paths)
+	if test -e $lib/lib
+
+		# find a binary with a link-time dependency on this lib
+		for referrer in (nix-store --query --referrers $lib | tail -n +2)
+			if test -e $referrer/bin
+				for bin in $referrer/bin/*
+					if otool -L $bin | fgrep -q $lib
+						# otool mentions the library in this binary; print it out
+						echo
+						echo "# Depends on: $lib:"
+						otool -L $bin
+						cp -a -n $lib $referrer candidate-store/
+					end
+				end
+			end
+		end
+	end
+end | tee $argv[1]
