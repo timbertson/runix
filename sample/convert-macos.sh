@@ -8,6 +8,6 @@ chmod -R u+w "$1"
 find "$1" -perm -u+x -type f | while read exe_file; do
 	if file "$exe_file" | grep -q 'Mach-O'; then
 		echo "$exe_file"
-		../target/debug/runix --transform "$exe_file"
+		../target/debug/runix --rewrite "$exe_file"
 	fi
 done

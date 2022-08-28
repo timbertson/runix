@@ -10,12 +10,12 @@ mkShell {
 		rustc
 		rust-analyzer # IDE
 		libiconv curl # native libs
-		# ] ++ (
-		# lib.optionals stdenv.isDarwin (with darwin.apple_sdk; [
-		# 	frameworks.Security
+		] ++ (
+		lib.optionals stdenv.isDarwin (with darwin.apple_sdk; [
+			frameworks.Security
 		# 	frameworks.CoreServices
 		# 	frameworks.CoreFoundation
 		# 	frameworks.Foundation
 		# 	frameworks.AppKit
-		];
+		]));
 }

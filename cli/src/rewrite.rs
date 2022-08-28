@@ -1,14 +1,39 @@
 use anyhow::*;
-use std::env;
 use log::*;
-use std::{process::Command, path::Path, io::BufRead};
+use std::{process::Command, path::Path, io::BufRead, os::unix::prelude::PermissionsExt};
+use walkdir::WalkDir;
+use crate::paths::{RewritePaths, self};
 
-// NOTE: these paths must be the same length
-const REMAP_SRC:      &'static str = "/nix/store";
-const REMAP_TMP_DEST: &'static str = "/tmp/runix";
+pub fn rewrite_recursively<P: AsRef<Path>>(src_path: &P, rewrite_paths: &RewritePaths) -> Result<()> {
+	for entry in WalkDir::new(src_path).follow_links(false) {
+		let entry = entry?;
+		let path = entry.path();
+		let stat = entry.metadata()?;
+		if stat.is_file() {
+			let perms = stat.permissions();
+			let mode = perms.mode();
+			if (mode & 0o100) != 0 { // user-executable
+				// TODO: check magic number(s) myself
+				trace!("Checking if executable is a mach-o binary: {:?}", &path);
+				if let Result::Ok(file_output) = Command::new("file").arg(path).output() {
+					let out_str = String::from_utf8(file_output.stdout)?;
+					if out_str.contains("Mach-O") {
+						debug!("rewriting mach-o binary: {:?}", path);
+						rewrite_macos(path, rewrite_paths)?;
+						paths::util::ensure_unwriteable(path)?;
+					}
+				}
+			}
+		}
+		trace!("rewritten recursively: {:?}", path);
+	}
 
-pub fn rewrite_macos<P: AsRef<Path>>(src_path: &P, remap: &Remap) -> Result<()> {
+	Ok(())
+}
+
+pub fn rewrite_macos<P: AsRef<Path>>(src_path: P, rewrite_paths: &RewritePaths) -> Result<()> {
 	let path = src_path.as_ref();
+	paths::util::ensure_writeable(path)?;
 
 	/*
 	Inspect with `otool -l`
@@ -56,7 +81,7 @@ pub fn rewrite_macos<P: AsRef<Path>>(src_path: &P, remap: &Remap) -> Result<()> 
 		let line = line_r?;
 		for word in line.split_ascii_whitespace() {
 			// TODO be clever about what kind of name it is, we're just assuming it's an LC_LOAD_DYLIB
-			if let Some(replacement) = remap.replacement(word) {
+			if let Some(replacement) = rewrite_paths.rewritten(word) {
 				debug!("remapping: {}", &replacement);
 				replacements.push((word, replacement));
 			}
@@ -77,39 +102,4 @@ pub fn rewrite_macos<P: AsRef<Path>>(src_path: &P, remap: &Remap) -> Result<()> 
 		}
 	}
 	Ok(())
-}
-
-
-pub struct Remap {
-	pub src: &'static str,
-	pub tmp_dest: &'static str,
-	pub dest_prefix: String,
-}
-
-impl Remap {
-	pub fn from_env() -> Result<Self> {
-		let base = env::var("RUNIX_ROOT").map_err(|_| anyhow!("$RUNIX_ROOT required"))?;
-		Self::for_dest(base)
-	}
-	
-	pub fn for_dest(dest_prefix: String) -> Result<Self> {
-		if !dest_prefix.starts_with("/") {
-			return Err(anyhow!("RUNIX_ROOT doesn't begin with / [{}]", &dest_prefix));
-		}
-
-		Ok(Self {
-			src: REMAP_SRC,
-			tmp_dest: REMAP_TMP_DEST,
-			dest_prefix: dest_prefix,
-		})
-	}
-
-	pub fn replacement<'a>(&self, value: &'a str) -> Option<String> {
-		let suffix = value.strip_prefix(self.src)?;
-		Some(format!("{}{}", &self.tmp_dest, suffix))
-	}
-	
-	pub fn dest_store(&self) -> String {
-		format!("{}{}", self.dest_prefix, self.src)
-	}
 }

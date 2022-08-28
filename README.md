@@ -98,3 +98,11 @@ How to specify caches? When you run? Or in a config file.
 
  - how do we manage roots? A user-specific config file would do, but we surely want to support anonymous targets.
  - maintain access timestamps, and cleanup targets not accessed within a given time?
+
+# Caveats:
+
+**Statically compiled binaries** (typically golang) will not be modified nor be subject to runtime inection. This is typiclly fine, as the primary purpose for both of these. The main issue is likely to be hardcoded paths in the compiled binary. The software will run, but default paths may not be found.
+
+TODO: can we rewtite all /nix/store references, not just the ones istall_name_tool can edit? This would fix e.g. wrapper scripts.
+
+**LC_ID_DYLIB**: This can't be edited, so software compiled against runix-provided dependencies may not be executable outside of runix. There may be workarounds, but this is not a common enough use case to think about yet.
