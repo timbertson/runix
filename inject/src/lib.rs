@@ -17,15 +17,15 @@ use libc::{uid_t, c_int};
 // type opaque_ptr = *const ();
 type string_ptr = *const libc::c_char;
 
-// Emulate C's `__attribute__((constructor))`
-// Under the hood it's just a section with `.init_array` and `.init_array_end` ASM sections.
-#[no_mangle]
-// #[link_section = ".init_array"] // Linux
-#[link_section = "__DATA,__mod_init_func"] // MacOS
-pub static LD_PRELOAD_INITIALISE_RUST: extern "C" fn() = self::ld_preload_init;
-extern "C" fn ld_preload_init() {
-	dbg!("INIT");
-}
+// // Emulate C's `__attribute__((constructor))`
+// // Under the hood it's just a section with `.init_array` and `.init_array_end` ASM sections.
+// #[no_mangle]
+// // #[link_section = ".init_array"] // Linux
+// #[link_section = "__DATA,__mod_init_func"] // MacOS
+// pub static LD_PRELOAD_INITIALISE_RUST: extern "C" fn() = self::ld_preload_init;
+// extern "C" fn ld_preload_init() {
+// 	dbg!("INIT");
+// }
 
 
 const REMAP_SRC: &'static [u8] = "/nix/".as_bytes();

@@ -114,4 +114,8 @@ pub mod util {
 		}
 		Ok(())
 	}
+	
+	pub fn is_executable(perms: fs::Permissions) -> bool {
+		(perms.mode() & 0o100) != 0
+	}
 }

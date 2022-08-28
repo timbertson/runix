@@ -1,6 +1,6 @@
 use anyhow::*;
 use log::*;
-use std::{process::Command, path::Path, io::BufRead, os::unix::prelude::PermissionsExt};
+use std::{process::Command, path::Path, io::BufRead};
 use walkdir::WalkDir;
 use crate::paths::{RewritePaths, self};
 
@@ -11,8 +11,7 @@ pub fn rewrite_recursively<P: AsRef<Path>>(src_path: &P, rewrite_paths: &Rewrite
 		let stat = entry.metadata()?;
 		if stat.is_file() {
 			let perms = stat.permissions();
-			let mode = perms.mode();
-			if (mode & 0o100) != 0 { // user-executable
+			if paths::util::is_executable(perms) {
 				// TODO: check magic number(s) myself
 				trace!("Checking if executable is a mach-o binary: {:?}", &path);
 				if let Result::Ok(file_output) = Command::new("file").arg(path).output() {

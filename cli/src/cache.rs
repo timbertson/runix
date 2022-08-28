@@ -152,6 +152,10 @@ impl Client {
 		let mut state = ClientState::default();
 		self.cache_with_state(&mut state, entry)
 	}
+	
+	pub fn store_path(&self, entry: &StoreIdentity) -> PathBuf {
+		self.paths.store_path.join(&entry.directory)
+	}
 
 	fn cache_with_state(&self, state: &mut ClientState, entry: &StoreIdentity) -> Result<()> {
 		if state.checked.contains(entry) {
@@ -181,7 +185,8 @@ impl Client {
 
 		for server in self.servers.iter() {
 			let url = server.narinfo_url(&entry);
-			info!("fetching {:?}", &url);
+			info!("Caching {:?}", &entry);
+			debug!("fetching {:?}", &url);
 			let resp = reqwest::blocking::get(&url)?.text();
 			debug!("{:?}", resp);
 			match resp {
