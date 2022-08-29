@@ -100,6 +100,7 @@ pub fn main() -> Result<()> {
 			Err(cmd
 				.env("DYLD_INSERT_LIBRARIES", inject)
 				.env("DYLD_FORCE_FLAT_NAMESPACE", "1")
+				.env("RUNIX_ROOT", &paths.runix_root)
 				.env("PATH", child_path)
 				.exec().into())
 				

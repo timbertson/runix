@@ -1,4 +1,3 @@
-/candidates
-/dead-paths
-/macos/nix
 /candidate-store
+/store-paths/*
+/platform

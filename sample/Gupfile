@@ -1,2 +1,2 @@
-./convert-macos.sh:
-	macos/nix/store/*
+./compute-store-path.sh:
+	store-paths/*

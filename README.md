@@ -43,13 +43,9 @@ Since it's not always possible to expand a file, we alter `/nix/store` to `/tmp/
 
 Extremely vague and imaginary...
 
-### Basic sandbox
+### Support for custom binary caches
 
-Minimal `chroot` / `proot` implementation remapping read requests for `/nix/*` to a corresponding path under $RUNIX_ROOT. It's not really a sandbox, it's more like a symlink in a trenchcoat.
-
-### Binary Cache API:
-
-Fetch implementations (recursively) from binary cache. Start with official nix one, then cachix.
+e.g. cachix
 
 ### Installer:
 
@@ -103,6 +99,6 @@ How to specify caches? When you run? Or in a config file.
 
 **Statically compiled binaries** (typically golang) will not be modified nor be subject to runtime inection. This is typiclly fine, as the primary purpose for both of these. The main issue is likely to be hardcoded paths in the compiled binary. The software will run, but default paths may not be found.
 
-TODO: can we rewtite all /nix/store references, not just the ones istall_name_tool can edit? This would fix e.g. wrapper scripts.
+TODO: can / should we rewtite all /nix/store references, not just the ones istall_name_tool can edit? This would fix e.g. wrapper scripts.
 
-**LC_ID_DYLIB**: This can't be edited, so software compiled against runix-provided dependencies may not be executable outside of runix. There may be workarounds, but this is not a common enough use case to think about yet.
+**LC_ID_DYLIB**: This can't be edited, so software compiled against runix-provided dependencies may link against missing paths. There will be workarounds, but this is not a common enough use case to think about yet.
