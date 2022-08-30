@@ -62,7 +62,7 @@ pub fn main() -> Result<()> {
 
 			let tmp_symlink = Path::new(paths.rewrite.tmp_dest);
 			let dest_store = &paths.store_path;
-			// TODO don't bother if it's already correct?
+			// TODO: don't bother if it's already correct?
 			debug!("Linking {:?} -> {:?}", tmp_symlink, &dest_store);
 			if let Err(_) = symlink(&dest_store, tmp_symlink) {
 				debug!("Unlinking {:?} and retrying ...", tmp_symlink);

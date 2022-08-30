@@ -88,7 +88,7 @@ pub struct NarInfo<'a> {
 
 impl<'a> NarInfo<'a> {
 	fn parse(server: &'a Server, identity: &'a StoreIdentity, s: &str) -> Result<Self> {
-		let invalid = || anyhow!("Can't parse narinfo response:\n{}", s);
+		let invalid = || anyhow!("Can't parse narinfo response for {:?}:\n{}", identity, s);
 		let mut url = None;
 		let mut compression = None;
 		let mut references = None;
@@ -187,19 +187,17 @@ impl Client {
 			let url = server.narinfo_url(&entry);
 			info!("Caching {:?}", &entry);
 			debug!("fetching {:?}", &url);
-			let resp = reqwest::blocking::get(&url)?.text();
-			debug!("{:?}", resp);
-			match resp {
-				Result::Ok(text) => {
-					return Ok(Some(NarInfo::parse(&server, &entry, &text)?))
-				},
-				Result::Err(err) => {
-					if err.status() == Some(StatusCode::NOT_FOUND) {
-						debug!("Not found");
-					} else {
-						warn!("Error fetching from {:?}: {:?}", server, err);
-						// continue trying other servers, just in case
-					}
+			let response = reqwest::blocking::get(&url)?;
+			debug!("response: {:?}", response);
+			let status = response.status();
+			if status.is_success() {
+				return Ok(Some(NarInfo::parse(&server, &entry, &response.text()?)?))
+			} else {
+				if status == StatusCode::NOT_FOUND {
+					debug!("Not found");
+				} else {
+					warn!("Error fetching from {:?}: {:?}", server, status);
+					// continue trying other servers, just in case
 				}
 			}
 		}

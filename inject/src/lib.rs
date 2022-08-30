@@ -87,7 +87,7 @@ hook! { unsafe fn open(path: string_ptr, flags: libc::c_int, mode: libc::mode_t)
 	intercept(path, |p| open(p, flags, mode))
 }}
 
-hook! { unsafe fn getuid() -> uid_t => wrapped_getuid {
-	dbg!("getuid() -> 0");
-	0
-}}
+// hook! { unsafe fn getuid() -> uid_t => wrapped_getuid {
+// 	dbg!("getuid() -> 0");
+// 	0
+// }}

@@ -4,6 +4,7 @@ use std::{env, path::PathBuf};
 // NOTE: these paths must be the same length
 const NIX_STORE: &'static str = "/nix/store";
 const TMP_RUNIX: &'static str = "/tmp/runix";
+// TODO for multi-user support, we could use the first 5 chars of the hash of "runix#USERNAME" in b64
 
 const REWRITE_PATHS: RewritePaths = RewritePaths {
 	src: NIX_STORE,
