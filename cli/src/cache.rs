@@ -4,7 +4,7 @@ use anyhow::*;
 use log::*;
 use reqwest::StatusCode;
 use reqwest::blocking::Response;
-use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf};
+use std::{fs::{self, DirEntry}, process::{Command, Stdio}, collections::HashSet, path::PathBuf};
 
 use crate::paths::RuntimePaths;
 use crate::rewrite;
@@ -34,6 +34,10 @@ pub struct StoreIdentity {
 }
 
 impl StoreIdentity {
+	pub fn new(directory: String) -> Self {
+		Self { directory }
+	}
+
 	pub fn hash(&self) -> &str {
 		self.directory.split('-').next().unwrap_or_else(|| panic!("empty split"))
 	}
@@ -83,7 +87,7 @@ pub struct NarInfo<'a> {
 	identity: &'a StoreIdentity,
 	server: &'a Server,
 	compression: Compression,
-	references: Vec<StoreIdentity>,
+	pub references: Vec<StoreIdentity>,
 }
 
 impl<'a> NarInfo<'a> {
@@ -256,7 +260,7 @@ impl Client {
 
 		// rewrite rpaths etc.
 		// TODO: capture a rewrite_version, so we can redo old paths if rewrite logic changes
-		rewrite::rewrite_recursively(&extract_dest, &self.paths.rewrite)?;
+		rewrite::rewrite_all_recursively(&extract_dest, &self.paths.rewrite, &nar_info)?;
 
 		let dest = self.paths.store_path.join(&nar_info.identity.directory);
 

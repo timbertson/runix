@@ -58,8 +58,6 @@ pub fn main() -> Result<()> {
 		}
 
 		if let Some(exe) = arg {
-			let inject = concat!(env!("CARGO_MANIFEST_DIR"), "/../target/debug/librunix_inject.dylib");
-
 			let tmp_symlink = Path::new(paths.rewrite.tmp_dest);
 			let dest_store = &paths.store_path;
 			// TODO: don't bother if it's already correct?
@@ -69,8 +67,7 @@ pub fn main() -> Result<()> {
 				fs::remove_file(tmp_symlink)?;
 				symlink(&dest_store, tmp_symlink)?;
 			}
-			debug!("Injecting: {:?}", inject);
-			
+
 			let mut full_exe = None;
 			if !exe.contains('/') {
 				for p in search_paths.iter() {
@@ -97,9 +94,12 @@ pub fn main() -> Result<()> {
 			cmd.args(args);
 			debug!("{:?}", cmd);
 
+			// let inject = concat!(env!("CARGO_MANIFEST_DIR"), "/../target/debug/librunix_inject.dylib");
+			// debug!("Injecting: {:?}", inject);
+			
 			Err(cmd
-				.env("DYLD_INSERT_LIBRARIES", inject)
-				.env("DYLD_FORCE_FLAT_NAMESPACE", "1")
+				// .env("DYLD_INSERT_LIBRARIES", inject)
+				// .env("DYLD_FORCE_FLAT_NAMESPACE", "1")
 				.env("RUNIX_ROOT", &paths.runix_root)
 				.env("PATH", child_path)
 				.exec().into())
