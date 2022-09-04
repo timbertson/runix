@@ -1,13 +1,14 @@
 mod paths;
 mod rewrite;
 mod cache;
+mod platform;
+mod runner;
 
 use anyhow::*;
 use log::*;
 use std::{process::Command, os::unix::{process::CommandExt, fs::symlink}, path::{Path, PathBuf}, env};
 use itertools::Itertools;
 use std::fs;
-use crate::paths::*;
 
 use crate::paths::RuntimePaths;
 
@@ -22,12 +23,13 @@ pub fn main() -> Result<()> {
 	let first_arg = args.next().unwrap();
 	
 	if first_arg == "--rewrite" {
-		let file_arg = args.next().unwrap();
-		debug!("rewriting: {:?}", &file_arg);
-		if args.next().is_some() {
-			return Err(anyhow!("too many arguments"));
-		}
-		rewrite::rewrite_macos(&file_arg, &RewritePaths::default())
+		// let file_arg = args.next().unwrap();
+		// debug!("rewriting: {:?}", &file_arg);
+		// if args.next().is_some() {
+		// 	return Err(anyhow!("too many arguments"));
+		// }
+		// rewrite::rewrite_macos(&file_arg, &RewritePaths::default())
+		todo!("remove?");
 	} else {
 		let paths = RuntimePaths::from_env()?;
 		let mut search_paths = Vec::new();

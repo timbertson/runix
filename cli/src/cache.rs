@@ -4,12 +4,13 @@ use anyhow::*;
 use log::*;
 use reqwest::StatusCode;
 use reqwest::blocking::Response;
-use std::{fs::{self, DirEntry}, process::{Command, Stdio}, collections::HashSet, path::PathBuf};
+use serde::{Deserialize, Serialize};
+use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf};
 
 use crate::paths::RuntimePaths;
 use crate::rewrite;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Server {
 	pub root: String,
 }
@@ -28,7 +29,7 @@ impl Server {
 
 
 // The directory name within /nix/store, including both the hash and the name
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StoreIdentity {
 	directory: String,
 }
@@ -208,6 +209,7 @@ impl Client {
 		Err(anyhow!("Entry {:?} not found on any cache", entry)).context(format!("Servers: {:?}", &self.servers))
 	}
 	
+	// TODO use nix_nar for smaller closure?
 	fn extract(mut response: Response, compression: Compression, extract_to: &PathBuf) -> Result<()> {
 		let mut decompress_cmd = match compression {
 			// TODO should this be a bundled dependency?
