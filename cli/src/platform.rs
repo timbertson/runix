@@ -23,6 +23,18 @@ impl FromStr for OS {
 	}
 }
 
+impl OS {
+	pub fn current() -> Result<Self> {
+		if cfg!(target_os = "macos") {
+			Ok(Self::macOS)
+		} else if cfg!(target_arch = "linux") {
+			Ok(Self::Linux)
+		} else {
+			Err(anyhow!("Unknown OS: {}", std::env::consts::OS))
+		}
+	}
+}
+
 impl Display for OS {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.write_str(match self {
@@ -53,6 +65,20 @@ impl FromStr for Arch {
 	}
 }
 
+impl Arch {
+	pub fn current() -> Result<Self> {
+		if cfg!(target_arch = "x86_64") {
+			Ok(Self::x86_64)
+		} else if cfg!(target_arch = "x86") {
+			Ok(Self::i686)
+		} else if cfg!(target_arch = "aarch64") {
+			Ok(Self::i686)
+		} else {
+			Err(anyhow!("Unknown architecture: {}", std::env::consts::ARCH))
+		}
+	}
+}
+
 impl Display for Arch {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.write_str(match self {
@@ -67,6 +93,15 @@ impl Display for Arch {
 pub struct Platform {
 	os: OS,
 	arch: Arch,
+}
+
+impl Platform {
+	pub fn current() -> Result<Self> {
+		Ok(Self {
+			os: OS::current()?,
+			arch: Arch::current()?,
+		})
+	}
 }
 
 impl ToString for Platform {

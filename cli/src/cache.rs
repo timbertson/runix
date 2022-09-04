@@ -31,7 +31,7 @@ impl Server {
 // The directory name within /nix/store, including both the hash and the name
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StoreIdentity {
-	directory: String,
+	pub directory: String,
 }
 
 impl StoreIdentity {
@@ -158,10 +158,6 @@ impl Client {
 		self.cache_with_state(&mut state, entry)
 	}
 	
-	pub fn store_path(&self, entry: &StoreIdentity) -> PathBuf {
-		self.paths.store_path.join(&entry.directory)
-	}
-
 	fn cache_with_state(&self, state: &mut ClientState, entry: &StoreIdentity) -> Result<()> {
 		if state.checked.contains(entry) {
 			// already planned

@@ -1,6 +1,8 @@
 use anyhow::*;
 use std::{env, path::PathBuf};
 
+use crate::cache::StoreIdentity;
+
 // NOTE: these paths must be the same length
 const NIX_STORE: &'static str = "/nix/store";
 const TMP_RUNIX: &'static str = "/tmp/runix";
@@ -39,6 +41,10 @@ pub struct RuntimePaths {
 }
 
 impl RuntimePaths {
+	pub fn store_path_for(&self, entry: &StoreIdentity) -> PathBuf {
+		self.store_path.join(&entry.directory)
+	}
+
 	pub fn from_env() -> Result<Self> {
 		let base = env::var("RUNIX_ROOT").or_else(|_| {
 			env::var("HOME").map(|home| format!("{}/.cache/runix", home))
