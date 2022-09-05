@@ -5,7 +5,7 @@ use anyhow::*;
 use serde::{Deserialize, Serialize, de};
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OS {
 	Linux,
 	macOS,
@@ -45,7 +45,7 @@ impl Display for OS {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Arch {
 	i686,
 	x86_64,
@@ -89,7 +89,7 @@ impl Display for Arch {
 	}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Platform {
 	os: OS,
 	arch: Arch,

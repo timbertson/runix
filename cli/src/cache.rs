@@ -35,10 +35,6 @@ pub struct StoreIdentity {
 }
 
 impl StoreIdentity {
-	pub fn new(directory: String) -> Self {
-		Self { directory }
-	}
-
 	pub fn hash(&self) -> &str {
 		self.directory.split('-').next().unwrap_or_else(|| panic!("empty split"))
 	}

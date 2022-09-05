@@ -19,12 +19,12 @@ pub struct RewritePaths {
 	pub tmp_dest: &'static str,
 }
 
-impl RewritePaths {
-	pub fn rewritten<'a>(&self, value: &'a str) -> Option<String> {
-		let suffix = value.strip_prefix(self.src)?;
-		Some(format!("{}{}", &self.tmp_dest, suffix))
-	}
-}
+// impl RewritePaths {
+// 	pub fn rewritten<'a>(&self, value: &'a str) -> Option<String> {
+// 		let suffix = value.strip_prefix(self.src)?;
+// 		Some(format!("{}{}", &self.tmp_dest, suffix))
+// 	}
+// }
 
 impl Default for RewritePaths {
 	fn default() -> Self {
@@ -69,6 +69,7 @@ impl RuntimePaths {
 	}
 }
 
+#[allow(dead_code)]
 pub mod util {
 	use anyhow::*;
 	use log::*;
@@ -87,7 +88,6 @@ pub mod util {
 		Ok(())
 	}
 
-	#[allow(dead_code)]
 	pub fn ensure_writeable<P: AsRef<Path>>(path: P) -> Result<()> {
 		let path = path.as_ref();
 		ensure_writeable_stat(path, &fs::symlink_metadata(path)?)

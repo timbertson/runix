@@ -7,7 +7,8 @@ mod runner;
 use anyhow::*;
 use log::*;
 
-use crate::{paths::RuntimePaths, runner::PlatformExec};
+use crate::platform::Platform;
+use crate::runner::{RunScript,PlatformExec};
 
 pub fn main() -> Result<()> {
 	env_logger::init_from_env(
@@ -28,7 +29,6 @@ pub fn main() -> Result<()> {
 		// rewrite::rewrite_macos(&file_arg, &RewritePaths::default())
 		todo!("remove?");
 	} else {
-		let paths = RuntimePaths::from_env()?;
 		let mut platform_exec = PlatformExec {
 			exec: None,
 			requirements: vec!(),
@@ -41,13 +41,9 @@ pub fn main() -> Result<()> {
 			arg = args.next();
 		}
 
-		let server = cache::Server {
-			root: "https://cache.nixos.org/".to_owned(),
-		};
-		let client = cache::Client {
-			servers: vec!(server),
-			paths: paths.clone(),
-		};
-		platform_exec.exec(&client, &paths, args)
+		let platform = Platform::current()?;
+		let mut run_script = RunScript::default();
+		run_script.add_platform(platform, platform_exec);
+		run_script.exec(platform, args)
 	}
 }

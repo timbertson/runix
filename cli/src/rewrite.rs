@@ -1,7 +1,7 @@
 use anyhow::*;
 use log::*;
 use memmap2::MmapMut;
-use std::{process::Command, path::Path, io::BufRead, fs};
+use std::{path::Path, fs};
 use walkdir::WalkDir;
 use crate::{paths::{RewritePaths, self}, cache::{NarInfo, StoreIdentity}};
 
@@ -96,8 +96,8 @@ mod tests {
 		RewriteReferences::new(
 			&RewritePaths::default(),
 			&vec!(
-				StoreIdentity::new("abcd-v1".to_owned()),
-				StoreIdentity::new("ghij-v1".to_owned()),
+				StoreIdentity::from("abcd-v1".to_owned()),
+				StoreIdentity::from("ghij-v1".to_owned()),
 			)
 		).unwrap()
 	}

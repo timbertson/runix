@@ -1,4 +1,4 @@
-use crate::cache::{StoreIdentity, self};
+use crate::cache::{StoreIdentity, self, Server};
 use crate::paths::RuntimePaths;
 use crate::platform::Platform;
 
@@ -83,21 +83,44 @@ impl PlatformExec {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct RunScript {
+pub struct RunScript {
 	caches: Vec<cache::Server>,
 	platform: HashMap<Platform, PlatformExec>,
 }
 
+impl Default for RunScript {
+	fn default() -> Self {
+		Self { caches: vec!(RunScript::default_cache()), platform: Default::default() }
+	}
+}
+
 impl RunScript {
+	pub fn default_cache() -> Server {
+		Server {
+			root: "https://cache.nixos.org/".to_owned(),
+		}
+	}
+
 	pub fn write<D: Write>(&self, mut dst: D) -> Result<()> {
 		write!(&mut dst, "#!/usr/bin/env runix")?;
 		serde_json::to_writer_pretty(&mut dst, self)?;
 		Ok(())
 	}
+	
+	pub fn add_platform(&mut self, platform: Platform, exec: PlatformExec) {
+		self.platform.insert(platform, exec);
+	}
 
-	pub fn current_platform(&self) -> Result<&PlatformExec> {
-		let current = Platform::current()?;
-		self.platform.get(&current).ok_or_else(|| anyhow!("No implementations provided for platform [{}]", current.to_string()))
+	pub fn exec<'a, I: Iterator<Item=String>>(self, platform: Platform, args: I) -> Result<()> {
+		let paths = RuntimePaths::from_env()?;
+		let Self { caches, platform: platforms } = self;
+		let client = cache::Client {
+			servers: caches,
+			paths: paths.clone(),
+		};
+
+		let platform_exec = platforms.get(&platform).ok_or_else(|| anyhow!("No implementations provided for platform [{}]", platform.to_string()))?;
+		platform_exec.exec(&client, &paths, args)
 	}
 
 	pub fn load<P: AsRef<Path>>(&self, p: P) -> Result<Self> {
