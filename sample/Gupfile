@@ -1,2 +1,5 @@
 ./compute-store-path.sh:
 	store-paths/*
+
+./make-wrapper.sh:
+	wrappers/*

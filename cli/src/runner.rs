@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entrypoint {
-	derivation: StoreIdentity,
-	path: String,
+	pub derivation: StoreIdentity,
+	pub path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,7 +28,19 @@ pub struct PlatformExec {
 	pub requirements: Vec<StoreIdentity>,
 }
 
+pub fn mandatory_next_arg<'a, I: Iterator<Item=String>>(desc: &'static str, args: &mut I) -> Result<String> {
+	mandatory_arg(desc, args.next())
+}
+
+pub fn mandatory_arg<T>(desc: &'static str, arg: Option<T>) -> Result<T> {
+	arg.ok_or_else(|| anyhow!("Not enough arguments (expecting {})", desc))
+}
+
 impl PlatformExec {
+	pub fn set_entrypoint(&mut self, entrypoint: Entrypoint) {
+		self.exec = Some(entrypoint)
+	}
+
 	pub fn exec<'a, I: Iterator<Item=String>>(&self, client: &cache::Client, paths: &RuntimePaths, mut args: I) -> Result<()> {
 		let tmp_symlink = Path::new(paths.rewrite.tmp_dest);
 		let dest_store = &paths.store_path;
@@ -42,11 +54,11 @@ impl PlatformExec {
 
 		let mut requirement_paths = Vec::new();
 
-		for req in self.requirements.iter() {
+		for req in self.requirements.iter().chain(self.exec.iter().map(|x| &x.derivation)) {
 			debug!("Caching: {:?}", &req);
 			client.cache(&req)?;
 			let store_path = paths.store_path_for(&req);
-			info!("Cached: {}", store_path.display());
+			debug!("Cached: {}", store_path.display());
 			
 			let bin_path = store_path.join("bin");
 			if bin_path.exists() {
@@ -62,7 +74,7 @@ impl PlatformExec {
 			.collect::<String>();
 			
 		let exe = match &self.exec {
-			None => PathBuf::from(args.next().ok_or_else(|| anyhow!("Not enough arguments"))?),
+			None => PathBuf::from(mandatory_next_arg("exe path", &mut args)?),
 			Some(exec) => paths.store_path_for(&exec.derivation).join(&exec.path),
 		};
 
@@ -102,7 +114,7 @@ impl RunScript {
 	}
 
 	pub fn write<D: Write>(&self, mut dst: D) -> Result<()> {
-		write!(&mut dst, "#!/usr/bin/env runix")?;
+		write!(&mut dst, "#!/usr/bin/env runix\n\n")?;
 		serde_json::to_writer_pretty(&mut dst, self)?;
 		Ok(())
 	}
@@ -119,12 +131,23 @@ impl RunScript {
 			paths: paths.clone(),
 		};
 
-		let platform_exec = platforms.get(&platform).ok_or_else(|| anyhow!("No implementations provided for platform [{}]", platform.to_string()))?;
+		let platform_exec = platforms.get(&platform)
+			.ok_or_else(|| anyhow!("No implementations provided for platform [{}]", platform.to_string()))?;
 		platform_exec.exec(&client, &paths, args)
 	}
 
-	pub fn load<P: AsRef<Path>>(&self, p: P) -> Result<Self> {
-		// TODO load JSON, skipping hashes
-		todo!()
+	pub fn load<P: AsRef<Path>>(p: P) -> Result<Self> {
+		// Load as JSON, but skip any front-matter
+		let path = p.as_ref();
+		debug!("Loading: {:?}", path);
+		let result: Result<Self> = (|| {
+			let entire_file = fs::read_to_string(path)?;
+			let idx = entire_file.find("\n{")
+				.ok_or_else(|| anyhow!("Missing leading brace"))?;
+			let (_, json) = entire_file.split_at(idx);
+			
+			Ok(serde_json::from_str::<Self>(json)?)
+		})();
+		result.with_context(|| anyhow!("Loading runix script: {}", path.display()))
 	}
 }

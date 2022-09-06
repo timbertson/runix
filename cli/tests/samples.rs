@@ -9,7 +9,11 @@ fn run_exe(pname: &str, args: Vec<&str>) -> Result<String> {
 	let store_path = fs::read_to_string(path)?;
 
 	let mut cmd = Command::new("../target/debug/runix");
-	cmd.arg("--cache").arg(store_path.trim().strip_prefix("/nix/store/").unwrap()).args(args);
+	cmd.arg("--cache").arg(store_path.trim()).args(args);
+	cmd_output(cmd)
+}
+
+fn cmd_output(mut cmd: Command) -> Result<String> {
 	println!("{:?}", &cmd);
 	let output = cmd.output()?;
 	let stderr = String::from_utf8(output.stderr)?;
@@ -20,6 +24,15 @@ fn run_exe(pname: &str, args: Vec<&str>) -> Result<String> {
 		);
 	#[allow(unstable_name_collisions)]
 	Ok(all_lines.intersperse("\n".to_owned()).collect())
+}
+
+fn run_wrapper(pname: &str, args: Vec<&str>) -> Result<String> {
+	let mut path = PathBuf::from("../sample/wrappers");
+	path.push(pname);
+	assert!(Command::new("gup").arg("-u").arg(&path).spawn()?.wait()?.success());
+	let mut cmd = Command::new(path);
+	cmd.args(args);
+	cmd_output(cmd)
 }
 
 fn assert_contains(needle: &'static str, data: String) -> Result<()> {
@@ -34,4 +47,10 @@ fn assert_contains(needle: &'static str, data: String) -> Result<()> {
 fn gnupg() -> Result<()> {
 	let output = run_exe("gnupg", vec!("gpg", "--help"))?;
 	assert_contains("gpg (GnuPG) 2.3.6", output)
+}
+
+#[test]
+fn jq() -> Result<()> {
+	let output = run_wrapper("jq", vec!("--help"))?;
+	assert_contains("jq - commandline JSON processor [version 1.6]", output)
 }
