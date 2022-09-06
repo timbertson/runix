@@ -1,8 +1,8 @@
 use std::{str::FromStr, fmt::{Display, self}};
 
-
 use anyhow::*;
-use serde::{Deserialize, Serialize, de};
+
+use crate::serde_from_string;
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -128,19 +128,4 @@ impl FromStr for Platform {
 	}
 }
 
-impl Serialize for Platform {
-	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-	where S: serde::Serializer {
-		serializer.serialize_str(&self.to_string())
-	}
-}
-
-impl<'de> Deserialize<'de> for Platform {
-	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-	where D: serde::Deserializer<'de> {
-		let s = String::deserialize(deserializer)?;
-		Platform::from_str(&s).map_err(|e| {
-			de::Error::custom(e)
-		})
-	}
-}
+serde_from_string!(Platform);

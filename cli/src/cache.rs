@@ -4,16 +4,17 @@ use anyhow::*;
 use log::*;
 use reqwest::StatusCode;
 use reqwest::blocking::Response;
-use serde::{Deserialize, Serialize};
-use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf};
+use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf, str::FromStr};
 
 use crate::paths::RuntimePaths;
 use crate::rewrite;
+use crate::serde_from_string;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Server {
 	pub root: String,
 }
+serde_from_string!(Server);
 
 impl Server {
 	pub fn narinfo_url(&self, entry: &StoreIdentity) -> String {
@@ -27,16 +28,44 @@ impl Server {
 	}
 }
 
+// TODO use TryFrom to avoid the need to explicitly declare this?
+impl FromStr for Server {
+	type Err = Error;
+	fn from_str(root: &str) -> Result<Self, Self::Err> {
+		Ok(From::from(root.to_owned()))
+	}
+}
+
+impl From<String> for Server {
+	fn from(root: String) -> Self {
+		Self { root: root.to_owned() }
+	}
+}
+
+impl ToString for Server {
+	fn to_string(&self) -> String {
+		self.root.to_owned()
+	}
+}
+
 
 // The directory name within /nix/store, including both the hash and the name
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StoreIdentity {
 	pub directory: String,
 }
 
+serde_from_string!(StoreIdentity);
+
 impl StoreIdentity {
 	pub fn hash(&self) -> &str {
 		self.directory.split('-').next().unwrap_or_else(|| panic!("empty split"))
+	}
+}
+
+impl ToString for StoreIdentity {
+	fn to_string(&self) -> String {
+		self.directory.to_owned()
 	}
 }
 
@@ -49,6 +78,14 @@ impl From<String> for StoreIdentity {
 impl From<&str> for StoreIdentity {
 	fn from(directory: &str) -> Self {
 		Self::from(directory.to_owned())
+	}
+}
+
+impl FromStr for StoreIdentity {
+	type Err = Error;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Ok(Self::from(s))
 	}
 }
 
