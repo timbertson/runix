@@ -2,3 +2,6 @@
 /store-paths/*
 /platform
 /wrappers
+/bootstrap-drv
+/bootstrap-dir
+/bootstrap-*.tgz

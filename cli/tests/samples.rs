@@ -3,7 +3,7 @@ use std::{process::Command, path::PathBuf, fs};
 use itertools::Itertools;
 
 fn run_exe(pname: &str, args: Vec<&str>) -> Result<String> {
-	let mut path = PathBuf::from("../sample/store-paths");
+	let mut path = PathBuf::from("../build/store-paths");
 	path.push(pname);
 	assert!(Command::new("gup").arg("-u").arg(&path).spawn()?.wait()?.success());
 	let store_path = fs::read_to_string(path)?;
@@ -27,7 +27,7 @@ fn cmd_output(mut cmd: Command) -> Result<String> {
 }
 
 fn run_wrapper(pname: &str, args: Vec<&str>) -> Result<String> {
-	let mut path = PathBuf::from("../sample/wrappers");
+	let mut path = PathBuf::from("../build/wrappers");
 	path.push(pname);
 	assert!(Command::new("gup").arg("-u").arg(&path).spawn()?.wait()?.success());
 	let mut cmd = Command::new(path);

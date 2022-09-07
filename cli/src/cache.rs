@@ -291,7 +291,7 @@ impl Client {
 
 		// rewrite rpaths etc.
 		// TODO: capture a rewrite_version, so we can redo old paths if rewrite logic changes
-		rewrite::rewrite_all_recursively(&extract_dest, &self.paths.rewrite, &nar_info)?;
+		rewrite::rewrite_all_recursively(&extract_dest, &self.paths.rewrite, &nar_info.references)?;
 
 		let dest = self.paths.store_path.join(&nar_info.identity.directory);
 

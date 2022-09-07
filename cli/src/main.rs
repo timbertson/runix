@@ -5,12 +5,14 @@ mod platform;
 mod runner;
 mod serde_util;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{io, fs};
 
 use anyhow::*;
 use log::*;
 
+use crate::cache::StoreIdentity;
+use crate::paths::RewritePaths;
 use crate::platform::Platform;
 use crate::runner::{RunScript, PlatformExec, Entrypoint, mandatory_arg, mandatory_next_arg};
 
@@ -24,14 +26,23 @@ pub fn main() -> Result<()> {
 	
 	let first_arg = mandatory_arg("at least one", args.peek())?;
 	
-	if first_arg == "--rewrite" {
-		// let file_arg = args.next().unwrap();
-		// debug!("rewriting: {:?}", &file_arg);
-		// if args.next().is_some() {
-		// 	return Err(anyhow!("too many arguments"));
-		// }
-		// rewrite::rewrite_macos(&file_arg, &RewritePaths::default())
-		todo!("remove?");
+	if first_arg == "--rewrite-entire-store" { // internal
+		args.next();
+		let base = PathBuf::from(args.next().unwrap());
+		let mut references = Vec::new();
+		let mut paths = Vec::new();
+		info!("Rewriting store: {:?}", &base);
+		for entry in base.read_dir()? {
+			let entry = entry?;
+			paths.push(entry.path());
+			references.push(StoreIdentity::from(entry.file_name().to_string_lossy().into_owned()));
+		}
+
+		for path in paths {
+			info!("rewriting: {:?} with {} references", &path, references.len());
+			rewrite::rewrite_all_recursively(&path, &RewritePaths::default(), &references)?;
+		}
+		Ok(())
 	} else {
 		let platform = Platform::current()?;
 		let mut save_to = None;

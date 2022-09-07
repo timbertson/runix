@@ -3,7 +3,7 @@ use log::*;
 use memmap2::MmapMut;
 use std::{path::Path, fs};
 use walkdir::WalkDir;
-use crate::{paths::{RewritePaths, self}, cache::{NarInfo, StoreIdentity}};
+use crate::{paths::{RewritePaths, self}, cache::StoreIdentity};
 
 fn windows_mut_each<T>(v: &mut [T], n: usize, mut f: impl FnMut(&mut [T])) {
 	let mut start = 0;
@@ -60,8 +60,11 @@ impl RewriteReferences {
 }
 
 // TODO support for some kind of opt-out via .nix-support/runix?
-pub fn rewrite_all_recursively<P: AsRef<Path>>(src_path: &P, rewrite_paths: &RewritePaths, nar_info: &NarInfo) -> Result<()> {
-	let rewrite = match RewriteReferences::new(rewrite_paths, &nar_info.references) {
+pub fn rewrite_all_recursively<'a, P: AsRef<Path>, R: IntoIterator<Item=&'a StoreIdentity>>(
+	src_path: &P,
+	rewrite_paths: &RewritePaths, references: R) -> Result<()>
+{
+	let rewrite = match RewriteReferences::new(rewrite_paths, references) {
 		None => return Ok(()),
 		Some(x) => x,
 	};

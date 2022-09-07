@@ -2,7 +2,7 @@
 with pkgs;
 let
   sources = import ./sources.nix {};
-  root = builtins.fetchGit { url = ../.; };
+  root = builtins.fetchGit { url = ../.; ref = "HEAD"; };
   fetlock = (callPackage sources.fetlock {});
   osx = darwin.apple_sdk.frameworks;
   selection = fetlock.cargo.load ./lock.nix {

@@ -1,0 +1,12 @@
+#!bash -eu
+gup -u bootstrap-drv
+mkdir -p "$1/store"
+requisites="$(nix-store --query --requisites "$(cat bootstrap-drv)" | sed -e 's@/nix/store/@@')"
+echo "$requisites" | while read drv; do
+	cp -a "/nix/store/$drv" "$1/store/$drv"
+done
+chmod +w "$1"
+../target/debug/runix --rewrite-entire-store "$1/store"
+
+impl="$(cat bootstrap-drv | sed -e 's@/nix/store/@@')"
+ln -sfn "./store/$impl/bin/runix" "$1/runix"

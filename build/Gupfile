@@ -3,3 +3,6 @@
 
 ./make-wrapper.sh:
 	wrappers/*
+
+./make-bootstrap.sh:
+	bootstrap-*.tgz
