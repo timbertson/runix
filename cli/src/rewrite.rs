@@ -69,7 +69,7 @@ pub fn rewrite_all_recursively<'a, P: AsRef<Path>, R: IntoIterator<Item=&'a Stor
 		Some(x) => x,
 	};
 
-	for entry in WalkDir::new(src_path).follow_links(false) {
+	for entry in WalkDir::new(src_path).follow_links(false).contents_first(true) {
 		let entry = entry?;
 		let path = entry.path();
 		let stat = entry.metadata()?;
@@ -84,6 +84,9 @@ pub fn rewrite_all_recursively<'a, P: AsRef<Path>, R: IntoIterator<Item=&'a Stor
 			if count > 0 {
 				debug!("Replaced {} items in {:?}", count, path);
 			}
+		}
+		if stat.is_file() || stat.is_dir() {
+			paths::util::ensure_unwriteable(&path)?;
 		}
 		trace!("rewritten recursively: {:?}", path);
 	}

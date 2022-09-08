@@ -117,9 +117,22 @@ impl RunScript {
 		self.caches.push(server)
 	}
 
-	pub fn write<D: Write>(&self, mut dst: D) -> Result<()> {
-		write!(&mut dst, "#!/usr/bin/env runix\n\n")?;
-		serde_json::to_writer_pretty(&mut dst, self)?;
+	pub fn write_to(&self, path: &str) -> Result<()> {
+		if path == "-" {
+			self.write(std::io::stdout())
+		} else {
+			let dest = fs::OpenOptions::new()
+				.write(true)
+				.truncate(true)
+				.create(true)
+				.open(path)?;
+			self.write(dest)
+		}
+	}
+
+	pub fn write<D: Write>(&self, mut dest: D) -> Result<()> {
+		write!(&mut dest, "#!/usr/bin/env runix\n\n")?;
+		serde_json::to_writer_pretty(&mut dest, self)?;
 		Ok(())
 	}
 	
@@ -164,5 +177,17 @@ impl RunScript {
 			Ok(serde_json::from_str::<Self>(json)?)
 		})();
 		result.with_context(|| anyhow!("Loading runix script: {}", path.display()))
+	}
+	
+	pub fn merge(&mut self, other: RunScript) {
+		let Self { caches, platform: platforms } = other;
+		for cache in caches {
+			if !self.caches.contains(&cache) {
+				self.caches.push(cache);
+			}
+		}
+		for (platform, platform_exec) in platforms.into_iter() {
+			self.platform.insert(platform, platform_exec);
+		}
 	}
 }

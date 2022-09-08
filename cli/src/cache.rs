@@ -4,13 +4,13 @@ use anyhow::*;
 use log::*;
 use reqwest::StatusCode;
 use reqwest::blocking::Response;
-use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf, str::FromStr};
+use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf, str::FromStr, fmt::Display};
 
 use crate::paths::RuntimePaths;
 use crate::rewrite;
 use crate::serde_from_string;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Server {
 	pub root: String,
 }
@@ -66,12 +66,6 @@ impl StoreIdentity {
 	}
 }
 
-impl ToString for StoreIdentity {
-	fn to_string(&self) -> String {
-		self.directory.to_owned()
-	}
-}
-
 impl From<String> for StoreIdentity {
 	fn from(directory: String) -> Self {
 		Self { directory }
@@ -89,6 +83,12 @@ impl FromStr for StoreIdentity {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		Ok(Self::from(s))
+	}
+}
+
+impl Display for StoreIdentity {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.directory.fmt(f)
 	}
 }
 
@@ -300,6 +300,7 @@ impl Client {
 
 		fs::rename(&extract_dest, &dest)
 			.with_context(|| format!("moving {:?} -> {:?}", &extract_dest, &dest))?;
+		info!("Fetched: {}", nar_info.identity);
 
 		Ok(())
 	}

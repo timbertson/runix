@@ -8,7 +8,8 @@ mod serde_util;
 use std::iter::Peekable;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
-use std::{io, fs, env};
+use std::str::FromStr;
+use std::env;
 
 use anyhow::*;
 use log::*;
@@ -42,13 +43,19 @@ pub fn main() -> Result<()> {
 			self_install(mandatory_next_arg("--self-install RunScript location", &mut args)?)
 		},
 
-		// onse --self-install has fetched the real implementation into the store, it
+		// once --self-install has fetched the real implementation into the store, it
 		// invokes this to activate itself
 		Some("--make-current") => {
 			args.next();
 			let identity = StoreIdentity::from(mandatory_next_arg("--make-current store ID", &mut args)?);
 			make_current(&paths::RuntimePaths::from_env()?, &identity)
-		}
+		},
+
+		Some("--merge-into") => {
+			args.next();
+			let dest = mandatory_next_arg("--make-current store ID", &mut args)?;
+			merge_into(dest, args)
+		},
 
 		// public CLI
 		_ => default_action(args),
@@ -87,36 +94,42 @@ fn make_current(paths: &RuntimePaths, identity: &StoreIdentity) -> Result<()> {
 }
 
 fn install_symlink_to_current_on_path(paths: &RuntimePaths) -> Result<()> {
-	let current = paths.current_symlink();
+	let mut current = paths.current_symlink();
+	current.push("bin");
+	current.push("runix");
 
-	let force_path = env::var("RUNIX_BIN_DEST").ok().map(|p| vec!(p));
-	let mut path = force_path.unwrap_or_else(|| {
-		env::var("PATH").map(|p| {
-			p.split(':').filter(|p| !p.is_empty()).map(|s| s.to_owned()).collect::<Vec<String>>()
-		}).unwrap_or_else(|_| Vec::new())
-	});
-	if path.is_empty() {
-		path.push("/usr/bin".to_owned());
-	}
+	let force_path = env::var("RUNIX_BIN_DEST").ok();
+	let mut path = force_path.or_else(|| env::var("PATH").ok())
+		.map(|path_str| {
+			path_str.split(':')
+				.filter(|part| !part.is_empty())
+				.map(|dir| dir.to_owned())
+				.collect::<Vec<String>>()
+		}).unwrap_or_else(|| Vec::new());
 	path.sort();
 	path.sort_by_key(|p| p.len()); // sort by length, then alphabetically
 	
-	let mut installed = false;
-	for p in path.iter() {
-		let bin_dest = PathBuf::from(p).join("runix");
-		debug!("Attempting symlink: {:?}", &bin_dest);
-		if symlink(&current, &bin_dest).is_ok() {
-			installed = true;
-			info!("Installed a symlink in {}", bin_dest.display());
-			break;
+	let bin_path: Vec<PathBuf> = path.into_iter().map(|p| PathBuf::from(p).join("runix")).collect();
+	if let Some(existing) = bin_path.iter().find(|p| p.exists()) {
+		warn!("Not installing symlink, runix already on $PATH: {}", existing.display());
+	} else {
+		let mut installed = false;
+		for bin_dest in bin_path {
+			debug!("Attempting symlink: {:?}", &bin_dest);
+			if symlink(&current, &bin_dest).is_ok() {
+				installed = true;
+				info!("Installed a symlink in {}", bin_dest.display());
+				break;
+			}
+		}
+
+		if !installed {
+			warn!("Failed to install anywhere on $PATH, please install manually. e.g:\n$ sudo ln -sfn {} /usr/bin/runix",
+				current.display()
+			)
 		}
 	}
 
-	if !installed {
-		warn!("Failed to install anywhere on $PATH, please do this yourself, e.g:\n$ sudo ln -sfn {} /usr/bin/runix",
-			current.display()
-		)
-	}
 	Ok(())
 }
 
@@ -134,9 +147,22 @@ fn self_install(script_path: String) -> Result<()> {
 	script.exec(platform, args.into_iter())
 }
 
+fn merge_into<A: Iterator<Item=String>>(dest: String, components: A) -> Result<()> {
+	let mut runscript = None;
+	for p in components {
+		let component = RunScript::load(p)?;
+		match runscript.as_mut() {
+			None => runscript = Some(component),
+			Some(existing) => existing.merge(component),
+		}
+	}
+	let runscript = runscript.ok_or_else(|| anyhow!("At least one runscript required to merge"))?;
+	runscript.write_to(&dest)
+}
+
 fn default_action<A: Iterator<Item=String>>(mut args: Peekable<A>) -> Result<()> {
 	let first_arg = mandatory_arg("at least one", args.peek())?;
-	let platform = Platform::current()?;
+	let mut platform = Platform::current()?;
 	let mut save_to = None;
 	let script_path = Path::new(&first_arg);
 
@@ -157,14 +183,18 @@ fn default_action<A: Iterator<Item=String>>(mut args: Peekable<A>) -> Result<()>
 		while let Some(argstr) = args.peek() {
 			if argstr == "--help" {
 				println!(r#"
-USAGE: runix [OPTIONS] [RUNSCRIPT] [...ARGS]
+USAGE:
+  runix RUNSCRIPT [...ARGS]
+  runix [OPTIONS] STORE_IDENTITY [...CMD]
+  runix --merge-into DEST [...RUNSCRIPTS]
 
 OPTIONS:
 --require IDENTITY              Add this store name as a requirement.
 --with-cache URI                Add this server to the list of caches used.
 --save PATH                     Save a runscript, instead of executing directly.
 --entrypoint IDENTITY RELPATH   Set the entrypoint derivation & path to run. If no entrypoint is given,
-                                runix will execute ARGS (after fetching requirments and setting up $PATH)."#);
+                                runix will execute ARGS (after fetching requirments and setting up $PATH).
+"#);
 				return Ok(());
 			} else if argstr == "--require" {
 				args.next();
@@ -177,11 +207,16 @@ OPTIONS:
 			} else if argstr == "--save" {
 				args.next();
 				save_to = Some(mandatory_next_arg("--save value", &mut args)?);
+			} else if argstr == "--platform" {
+				args.next();
+				platform = Platform::from_str(&mandatory_next_arg("--entrypoint derivation", &mut args)?)?;
 			} else if argstr == "--entrypoint" {
 				args.next();
 				let derivation = cache::StoreIdentity::from(mandatory_next_arg("--entrypoint derivation", &mut args)?);
 				let path = mandatory_next_arg("--entrypoint path", &mut args)?;
 				entrypoint = Some(Entrypoint { derivation, path });
+			} else if argstr.starts_with("--") {
+				return Err(anyhow!("Unknown option: {}", argstr));
 			} else {
 				break;
 			}
@@ -198,17 +233,10 @@ OPTIONS:
 	debug!("Runner script: {:?}", run_script);
 	match save_to {
 		Some(save_to) => {
-			debug!("Writing to: {}", &save_to);
-			if save_to == "-" {
-				run_script.write(io::stdout())
-			} else {
-				let dest = fs::OpenOptions::new()
-					.write(true)
-					.truncate(true)
-					.create(true)
-					.open(save_to)?;
-				run_script.write(dest)
+			if args.next().is_some() {
+				return Err(anyhow!("Too many arguments for --save operation"));
 			}
+			run_script.write_to(&save_to)
 		},
 		None => run_script.exec(platform, args),
 	}
