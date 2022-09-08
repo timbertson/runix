@@ -152,12 +152,28 @@ fn default_action<A: Iterator<Item=String>>(mut args: Peekable<A>) -> Result<()>
 			requirements: vec!(),
 		};
 		let mut entrypoint = None;
+		let mut run_script = RunScript::default();
 
 		while let Some(argstr) = args.peek() {
-			if argstr == "--cache" {
+			if argstr == "--help" {
+				println!(r#"
+USAGE: runix [OPTIONS] [RUNSCRIPT] [...ARGS]
+
+OPTIONS:
+--require IDENTITY              Add this store name as a requirement.
+--with-cache URI                Add this server to the list of caches used.
+--save PATH                     Save a runscript, instead of executing directly.
+--entrypoint IDENTITY RELPATH   Set the entrypoint derivation & path to run. If no entrypoint is given,
+                                runix will execute ARGS (after fetching requirments and setting up $PATH)."#);
+				return Ok(());
+			} else if argstr == "--require" {
 				args.next();
-				let entry = cache::StoreIdentity::from(mandatory_next_arg("--cache value", &mut args)?);
+				let entry = cache::StoreIdentity::from(mandatory_next_arg("--require value", &mut args)?);
 				platform_exec.requirements.push(entry);
+			} else if argstr == "--with-cache" {
+				args.next();
+				let server = cache::Server::from(mandatory_next_arg("--add-cache value", &mut args)?);
+				run_script.add_cache(server);
 			} else if argstr == "--save" {
 				args.next();
 				save_to = Some(mandatory_next_arg("--save value", &mut args)?);
@@ -175,7 +191,6 @@ fn default_action<A: Iterator<Item=String>>(mut args: Peekable<A>) -> Result<()>
 			platform_exec.set_entrypoint(entrypoint);
 		}
 
-		let mut run_script = RunScript::default();
 		run_script.add_platform(platform, platform_exec);
 		run_script
 	};

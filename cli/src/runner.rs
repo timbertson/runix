@@ -113,6 +113,10 @@ impl RunScript {
 		}
 	}
 
+	pub fn add_cache(&mut self, server: cache::Server) {
+		self.caches.push(server)
+	}
+
 	pub fn write<D: Write>(&self, mut dst: D) -> Result<()> {
 		write!(&mut dst, "#!/usr/bin/env runix\n\n")?;
 		serde_json::to_writer_pretty(&mut dst, self)?;

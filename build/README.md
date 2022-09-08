@@ -13,8 +13,7 @@ Bootstrap-dir contains the built and transformed store paths for the current pla
 To test a bootstrap without going full tarball, run:
 
 ```bash
-gup build/bootstrap-dir
-cachix push (cat build/botstrap-drv)
+gup build/bootstrap
 ./target/debug/runix --self-install build/bootstrap-dir/wrapper
 ```
 

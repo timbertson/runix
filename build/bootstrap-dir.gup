@@ -13,6 +13,5 @@ chmod +w "$1"
 store_identity="$(cat bootstrap-drv | trim_store_path)"
 
 ../target/debug/runix --generate-bootstrap "$1/store"
-../target/debug/runix --save "$1/wrapper" --entrypoint "$store_identity" bin/runix
-# echo "$store_identity" > store-identity
+../target/debug/runix --save "$1/wrapper" --with-cache https://runix.cachix.org --entrypoint "$store_identity" bin/runix
 ln -sfn "./store/$store_identity/bin/runix" "$1/runix"

@@ -37,8 +37,11 @@ impl FromStr for Server {
 }
 
 impl From<String> for Server {
-	fn from(root: String) -> Self {
-		Self { root: root.to_owned() }
+	fn from(mut root: String) -> Self {
+		if !root.ends_with('/') {
+			root.push('/');
+		}
+		Self { root }
 	}
 }
 
