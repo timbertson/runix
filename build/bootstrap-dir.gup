@@ -1,12 +1,18 @@
 #!bash -eu
 gup -u bootstrap-drv
 mkdir -p "$1/store"
-requisites="$(nix-store --query --requisites "$(cat bootstrap-drv)" | sed -e 's@/nix/store/@@')"
+function trim_store_path {
+	sed -e 's@/nix/store/@@'
+}
+requisites="$(nix-store --query --requisites "$(cat bootstrap-drv)" | trim_store_path)"
 echo "$requisites" | while read drv; do
 	cp -a "/nix/store/$drv" "$1/store/$drv"
 done
 chmod +w "$1"
-../target/debug/runix --rewrite-entire-store "$1/store"
 
-impl="$(cat bootstrap-drv | sed -e 's@/nix/store/@@')"
-ln -sfn "./store/$impl/bin/runix" "$1/runix"
+store_identity="$(cat bootstrap-drv | trim_store_path)"
+
+../target/debug/runix --generate-bootstrap "$1/store"
+../target/debug/runix --save "$1/wrapper" --entrypoint "$store_identity" bin/runix
+# echo "$store_identity" > store-identity
+ln -sfn "./store/$store_identity/bin/runix" "$1/runix"

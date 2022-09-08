@@ -123,6 +123,18 @@ impl RunScript {
 		self.platform.insert(platform, exec);
 	}
 
+	pub fn get_platform(&self, platform: Platform) -> Result<&PlatformExec> {
+		Self::get_platform_from(platform, &self.platform)
+	}
+
+	fn get_platform_from(platform: Platform, impls: &HashMap<Platform, PlatformExec>) -> Result<&PlatformExec> {
+		impls.get(&platform).ok_or_else(|| Self::platform_not_found(platform))
+	}
+	
+	fn platform_not_found(platform: Platform) -> Error {
+		anyhow!("No implementations provided for platform [{}]", platform.to_string())
+	}
+
 	pub fn exec<'a, I: Iterator<Item=String>>(self, platform: Platform, args: I) -> Result<()> {
 		let paths = RuntimePaths::from_env()?;
 		let Self { caches, platform: platforms } = self;
@@ -131,8 +143,7 @@ impl RunScript {
 			paths: paths.clone(),
 		};
 
-		let platform_exec = platforms.get(&platform)
-			.ok_or_else(|| anyhow!("No implementations provided for platform [{}]", platform.to_string()))?;
+		let platform_exec = Self::get_platform_from(platform, &platforms)?;
 		platform_exec.exec(&client, &paths, args)
 	}
 

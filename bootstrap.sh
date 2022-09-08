@@ -14,6 +14,6 @@ _() {
 	mkdir -p "$TMP_DEST"
 	tar xzf "$TMP_TAR" -C "$TMP_DEST"
 	ln -sfn "$TMP_DEST/store" /tmp/runix
-	"$TMP_DEST/runix" --self-install
+	"$TMP_DEST/runix" --self-install "$TMP_DEST/store-identity"
 }
 _

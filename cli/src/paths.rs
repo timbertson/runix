@@ -51,6 +51,10 @@ impl RuntimePaths {
 		}).map_err(|_| anyhow!("HOME or RUNIX_ROOT required"))?;
 		Self::for_dest(base)
 	}
+
+	pub fn current_symlink(&self) -> PathBuf {
+		PathBuf::from(&self.runix_root).join("current")
+	}
 	
 	pub fn for_dest(runix_root: String) -> Result<Self> {
 		if !runix_root.starts_with("/") {
