@@ -1,5 +1,5 @@
 use crate::cache::{StoreIdentity, self, Server};
-use crate::paths::RuntimePaths;
+use crate::paths::{RuntimePaths, self};
 use crate::platform::Platform;
 
 use std::fs;
@@ -8,7 +8,7 @@ use std::path::Path;
 use std::io::Write;
 use std::env;
 use std::path::PathBuf;
-use std::os::unix::{process::CommandExt, fs::symlink};
+use std::os::unix::process::CommandExt;
 use std::process::Command;
 
 use itertools::Itertools;
@@ -46,11 +46,7 @@ impl PlatformExec {
 		let dest_store = &paths.store_path;
 		// TODO: don't bother if it's already correct?
 		debug!("Linking {:?} -> {:?}", tmp_symlink, &dest_store);
-		if let Err(_) = symlink(&dest_store, tmp_symlink) {
-			debug!("Unlinking {:?} and retrying ...", tmp_symlink);
-			fs::remove_file(tmp_symlink)?;
-			symlink(&dest_store, tmp_symlink)?;
-		}
+		paths::util::symlink_force(&dest_store, tmp_symlink)?;
 		Ok(())
 	}
 

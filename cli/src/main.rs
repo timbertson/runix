@@ -88,8 +88,8 @@ fn make_current(paths: &RuntimePaths, identity: &StoreIdentity) -> Result<()> {
 	if !symlink_dest.exists() {
 		return Err(anyhow!("Specified store path does not exist: {}", symlink_dest.display()))
 	}
-	info!("Marking {} as the current runix implementation", symlink_dest.display());
-	symlink(symlink_dest, &current)?;
+	paths::util::symlink_force(&symlink_dest, &current)?;
+	info!("Symlinked current runix implementation:\n  {}", symlink_dest.display());
 	Ok(())
 }
 

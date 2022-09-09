@@ -77,12 +77,26 @@ impl RuntimePaths {
 pub mod util {
 	use anyhow::*;
 	use log::*;
-	use std::os::unix::fs::PermissionsExt;
+	use std::os::unix::fs::{PermissionsExt, symlink};
 	use std::{fs::{Metadata, self}, path::Path};
 
 	pub fn symlink_metadata<P: AsRef<Path>>(path: P) -> Result<Metadata> {
 		fs::symlink_metadata(&path).with_context(|| format!("stat: {}", path.as_ref().display()))
 	}
+
+	pub fn symlink_force<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) -> Result<()> {
+		let original = original.as_ref();
+		let link = link.as_ref();
+		let attempt = || {
+			symlink(original, link)
+		};
+
+		attempt().or_else(|_| {
+			fs::remove_file(link)?;
+			attempt()
+		}).with_context(|| format!("Symlinking {} -> {}", link.display(), original.display()))
+	}
+
 
 	pub fn ensure_writeable_stat<P: AsRef<Path>>(path: P, stat: &Metadata) -> Result<()> {
 		let mut perms = stat.permissions();

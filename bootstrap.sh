@@ -12,10 +12,14 @@ _() {
 		echo "TODO: download"
 	fi
 
-	if [ -e "$TMP_DEST" ]; then
-		chmod -R +w "$TMP_DEST"
-		rm -rf "$TMP_DEST"
-	fi
+	function cleanup {
+		if [ -e "$TMP_DEST" ]; then
+			chmod -R +w "$TMP_DEST"
+			rm -rf "$TMP_DEST"
+		fi
+	}
+
+	cleanup
 
 	echo >&2 "[runix-bootstrap] extracting ..."
 	mkdir -p "$TMP_DEST"
@@ -27,6 +31,6 @@ _() {
 	"$TMP_DEST/runix" --self-install "$TMP_DEST/wrapper"
 
 	echo >&2 "[runix-bootstrap] Cleaning up ..."
-	rm -f "$TMP_DEST"
+	cleanup
 }
 _
