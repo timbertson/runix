@@ -11,6 +11,8 @@ mkShell {
 		rust-analyzer # IDE
 		libiconv curl # native libs
 		cachix
+		gup
+		git
 		] ++ (
 		lib.optionals stdenv.isDarwin (with darwin.apple_sdk; [
 			frameworks.Security

@@ -1,7 +1,4 @@
-/candidate-store
 /store-paths/*
 /platform
+/platforms
 /wrappers
-/bootstrap-drv
-/bootstrap-dir
-/bootstrap-*.tgz

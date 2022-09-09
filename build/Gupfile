@@ -4,5 +4,23 @@
 ./make-wrapper.sh:
 	wrappers/*
 
-./make-bootstrap.sh:
-	bootstrap-*.tgz
+./scripts/platform-archive.gup:
+	platforms/*/runix-*.tgz
+
+./scripts/archive.gup:
+	platforms/*/archive
+
+./scripts/bootstrap-drv.gup:
+	platforms/*/bootstrap-drv
+
+./scripts/bootstrap-dir.gup:
+	platforms/*/bootstrap-dir
+
+./scripts/bootstrap-archive.gup:
+	platforms/*/bootstrap-archive
+
+./scripts/bootstrap.gup:
+	platforms/*/bootstrap
+
+./scripts/cross-tools.gup:
+	platforms/*/cross-tools

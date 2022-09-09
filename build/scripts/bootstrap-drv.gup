@@ -1,0 +1,38 @@
+#!bash -eu
+. ./scripts/common.sh
+gup --always
+CURRENT_PLATFORM="$(cat ../../platform)"
+if [ "$PLATFORM" = "$CURRENT_PLATFORM" ]; then
+	echo >&2 "Building with local nix"
+	nix-build ../../../ --no-out-link > "$1"
+else
+	echo >&2 "Cross-building via docker"
+	gup -u ./cross-tools
+	cross_nix="$(cat ./cross-tools/nix)"
+
+	gup -u ../../nix/nixpkgs-stable.path
+	nixpkgs_stable="$(cat ../../nix/nixpkgs-stable.path)"
+
+	set -x
+	HOST_UID="$(id -u)"
+	HOST_GID="$(id -g)"
+	ROOT="$(cd ../../.. && pwd)"
+
+
+	# It'd be nice to have anonymous IDs, but this label shouldn't clash
+	IMAGE_LABEL="$(echo runix-builder-$PLATFORM | tr '[:upper:]' '[:lower:]')"
+	docker build -t "$IMAGE_LABEL" --build-arg "HOST_UID=$HOST_UID" -f ../../../Dockerfile.builder .
+	docker run --rm \
+		--volume /nix:/nix \
+		--volume /etc/nix:/etc/nix \
+		--volume "$HOME/.cache/runix:/host-runix" \
+		--volume "$ROOT:/app" \
+		--volume "$nixpkgs_stable:/nix-stable" \
+		--env "NIX_PATH=nixpkgs=/nix-stable" \
+		--user "$HOST_UID" \
+		"$IMAGE_LABEL" \
+		/tmp/runix/$cross_nix/bin/nix-build --no-out-link /app \
+		| tee "$1"
+
+	[ -e "$(cat "$1")" ]
+fi

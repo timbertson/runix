@@ -1,0 +1,5 @@
+#!bash -eu
+. ./scripts/common.sh
+archive="runix-$PLATFORM.tgz"
+gup -u "$archive"
+ln -sfn "$archive" "$1"

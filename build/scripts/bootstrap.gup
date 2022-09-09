@@ -1,0 +1,6 @@
+#!bash -eu
+. ./scripts/common.sh
+
+# build & push to cachix
+gup -u archive
+cat ./bootstrap-drv | cachix push runix

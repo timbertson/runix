@@ -1,3 +1,0 @@
-#!bash -eu
-gup --always
-nix-build ../ --no-out-link > "$1"

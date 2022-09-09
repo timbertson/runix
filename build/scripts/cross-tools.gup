@@ -1,0 +1,31 @@
+#!bash -eux
+. ./scripts/common.sh
+
+gup -u ../../nix/nixpkgs-stable.path
+nixpkgs_stable="$(cat ../../nix/nixpkgs-stable.path)"
+
+function cross_store_path {
+	# Calculate nix's store path on the target architecture:
+	store_path="$(docker run --rm \
+		-v "$nixpkgs_stable:/nixpkgs-stable" \
+		nixos/nix \
+		nix-instantiate --eval /nixpkgs-stable -A $1)"
+	[ -n "$store_path" ]
+	echo "$store_path" | tr -d '"'
+}
+
+nix_drv="$(cross_store_path nix.outPath | trim_store_path)"
+
+# seed the local cache with runix (locally)
+"../../../target/debug/runix" --require "$nix_drv" true
+mkdir "$1"
+echo "$nix_drv" > "$1/nix"
+
+
+# TERRIBLE HACK: some drvs can't be fetched with the linux implementation of
+# nix, because it doesn't expect a case-insensitive
+# filesystem. So pre-fetch them on the host first
+for pname in stdenv ncurses; do
+	drv="$(cross_store_path "$pname.drvPath")"
+	nix-build --no-out-link "$drv"
+done

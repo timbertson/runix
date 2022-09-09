@@ -1,4 +1,0 @@
-#!bash -eu
-gup -u ./platform
-gup -u "bootstrap-$(cat ./platform).tgz"
-cat ./bootstrap-drv | cachix push runix
