@@ -11,9 +11,9 @@ let
   extractors = stdenv.mkDerivation {
     pname = "runix-extract";
     version = "1";
-    buildPhase = ''
+    buildCommand = ''
       mkdir -p "$out/bin"
-      cp -a ${xz}/bin/unxz "$out/bin"
+      cp -a --dereference ${xz}/bin/unxz "$out/bin"
     '';
   };
   selection = fetlock.cargo.load ./lock.nix {

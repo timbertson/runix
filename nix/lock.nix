@@ -15,7 +15,7 @@ in
       depKeys = [
         ("runix-0.1.0")
       ];
-      src = (final.pathSrc ./.);
+      src = (final.pathSrc ../.);
     };
     "aho-corasick-0.7.18" = {
       pname = "aho-corasick";
@@ -673,6 +673,18 @@ in
         ("default")
       ];
     };
+    "is_executable-1.0.1" = {
+      pname = "is_executable";
+      version = "1.0.1";
+      depKeys = [
+      ];
+      src = (pkgs.fetchurl {
+        hash = "sha256-+prNxtZ7deYmrWRHNOi8bfiT2c0qg0EpBl091hWOqcg=";
+        name = "crate.tar.gz";
+        url = "https://crates.io/api/v1/crates/is_executable/1.0.1/download";
+      });
+      edition = "2015";
+    };
     "itertools-0.10.3" = {
       pname = "itertools";
       version = "0.10.3";
@@ -854,6 +866,20 @@ in
       });
       buildSrc = "build.rs";
       edition = "2015";
+    };
+    "nix-nar-0.2.0" = {
+      pname = "nix-nar";
+      version = "0.2.0";
+      depKeys = [
+        ("is_executable-1.0.1")
+        ("thiserror-1.0.34")
+      ];
+      src = (pkgs.fetchurl {
+        hash = "sha256-25UO47TGhfYh6T6gdDX+WpVoJOP/WfRb3HKllLk0P5w=";
+        name = "crate.tar.gz";
+        url = "https://crates.io/api/v1/crates/nix-nar/0.2.0/download";
+      });
+      edition = "2021";
     };
     "num_cpus-1.13.1" = {
       pname = "num_cpus";
@@ -1169,6 +1195,7 @@ in
         ("itertools-0.10.3")
         ("log-0.4.17")
         ("memmap2-0.5.7")
+        ("nix-nar-0.2.0")
         ("reqwest-0.11.11")
         ("serde-1.0.144")
         ("serde_json-1.0.85")
@@ -1433,6 +1460,35 @@ in
         url = "https://crates.io/api/v1/crates/termcolor/1.1.3/download";
       });
       edition = "2018";
+    };
+    "thiserror-1.0.34" = {
+      pname = "thiserror";
+      version = "1.0.34";
+      depKeys = [
+        ("thiserror-impl-1.0.34")
+      ];
+      src = (pkgs.fetchurl {
+        hash = "sha256-jBsFyp0Qa6fS4xqdq0pk574szkFTIZZuoxMsSaZW4lI=";
+        name = "crate.tar.gz";
+        url = "https://crates.io/api/v1/crates/thiserror/1.0.34/download";
+      });
+      edition = "2018";
+    };
+    "thiserror-impl-1.0.34" = {
+      pname = "thiserror-impl";
+      version = "1.0.34";
+      depKeys = [
+        ("proc-macro2-1.0.43")
+        ("quote-1.0.21")
+        ("syn-1.0.99")
+      ];
+      src = (pkgs.fetchurl {
+        hash = "sha256-6PJZGYNkLehckhAV8/BwxmWhl+1p5BevQ2EV46FAdIc=";
+        name = "crate.tar.gz";
+        url = "https://crates.io/api/v1/crates/thiserror-impl/1.0.34/download";
+      });
+      edition = "2018";
+      procMacro = true;
     };
     "tinyvec-1.6.0" = {
       pname = "tinyvec";
