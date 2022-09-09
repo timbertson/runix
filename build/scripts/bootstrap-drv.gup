@@ -13,15 +13,14 @@ else
 	gup -u ../../nix/nixpkgs-stable.path
 	nixpkgs_stable="$(cat ../../nix/nixpkgs-stable.path)"
 
-	set -x
 	HOST_UID="$(id -u)"
 	HOST_GID="$(id -g)"
 	ROOT="$(cd ../../.. && pwd)"
 
-
 	# It'd be nice to have anonymous IDs, but this label shouldn't clash
 	IMAGE_LABEL="$(echo runix-builder-$PLATFORM | tr '[:upper:]' '[:lower:]')"
-	docker build -t "$IMAGE_LABEL" --build-arg "HOST_UID=$HOST_UID" -f ../../../Dockerfile.builder .
+	docker build -q -t "$IMAGE_LABEL" --build-arg "HOST_UID=$HOST_UID" -f ../../../Dockerfile.builder .
+	set -x
 	docker run --rm \
 		--volume /nix:/nix \
 		--volume /etc/nix:/etc/nix \
@@ -31,8 +30,9 @@ else
 		--env "NIX_PATH=nixpkgs=/nix-stable" \
 		--user "$HOST_UID" \
 		"$IMAGE_LABEL" \
-		/tmp/runix/$cross_nix/bin/nix-build --no-out-link /app \
+		/tmp/runix/$cross_nix/bin/nix-build --no-out-link --argstr platform "$PLATFORM" /app \
 		| tee "$1"
+	set +x
 
 	[ -e "$(cat "$1")" ]
 fi

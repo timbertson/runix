@@ -1,4 +1,7 @@
-{ pkgs ? import <nixpkgs> {}}:
+{
+	pkgs ? import <nixpkgs> {},
+	platform ? "current",
+}:
 with pkgs;
 let
   sources = import ./sources.nix {};
@@ -16,7 +19,7 @@ let
       cp -a --dereference ${xz}/bin/unxz "$out/bin"
     '';
   };
-  selection = fetlock.cargo.load ./lock.nix {
+  selection = fetlock.cargo.load (./lock + "/${platform}.nix") {
     pkgOverrides = self: [
       (self.overrideAttrs {
         runix = base: {

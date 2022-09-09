@@ -1,3 +1,0 @@
-#!bash -eu
-gup -u ../Cargo.lock
-fetlock -o "$1" -p ..

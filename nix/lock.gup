@@ -1,0 +1,10 @@
+#!bash -eu
+gup -u ../Cargo.lock
+mkdir "$1"
+
+fetlock -o "$1/Linux-x86_64.nix" -p .. --cargo-platform x86_64-unknown-linux-gnu
+fetlock -o "$1/Darwin-x86_64.nix" -p .. --cargo-platform x86_64-apple-darwin
+
+gup -u ../build/platform
+platform="$(cat ../build/platform)"
+ln -sfn "./$platform.nix" "$1/current.nix"

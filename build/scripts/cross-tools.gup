@@ -1,4 +1,4 @@
-#!bash -eux
+#!bash -eu
 . ./scripts/common.sh
 
 gup -u ../../nix/nixpkgs-stable.path
@@ -25,7 +25,7 @@ echo "$nix_drv" > "$1/nix"
 # TERRIBLE HACK: some drvs can't be fetched with the linux implementation of
 # nix, because it doesn't expect a case-insensitive
 # filesystem. So pre-fetch them on the host first
-for pname in stdenv ncurses; do
+for pname in stdenv ncurses perl; do
 	drv="$(cross_store_path "$pname.drvPath")"
 	nix-build --no-out-link "$drv"
 done

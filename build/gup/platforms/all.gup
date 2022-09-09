@@ -1,6 +1,6 @@
 #!bash -eu
 gup -u \
-	runix-Darwin-x86_64.tgz \
-	runix-Linux-x86_64.tgz \
+	Darwin-x86_64/archive \
+	Linux-x86_64/archive \
 	;
 # TODO: darwin--arch64

@@ -10,16 +10,16 @@ But for a given platform; they should be stable since nixpkgs is pinned.
 
 Bootstrap-dir contains the built and transformed store paths for the current platform.
 
-To test a bootstrap without going full tarball, run:
+To test a bootstrap without going full tarball, run e.g.:
 
 ```bash
-gup build/bootstrap
+gup build/platforms/Darwin-x86_64/bootstrap
 ./target/debug/runix --self-install build/bootstrap-dir/wrapper
 ```
 
 And via local tarball without having to upload it:
 
 ```bash
-gup build/bootstrap
+gup build/platforms/Darwin-x86_64/bootstrap
 env LOCAL_BOOTSTRAP=build/ bash -x bootstrap.sh
 ```
