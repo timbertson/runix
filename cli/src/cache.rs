@@ -6,7 +6,7 @@ use reqwest::StatusCode;
 use reqwest::blocking::Response;
 use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf, str::FromStr, fmt::Display};
 
-use crate::paths::RuntimePaths;
+use crate::paths::{RuntimePaths, self};
 use crate::rewrite;
 use crate::serde_from_string;
 
@@ -222,7 +222,6 @@ impl Client {
 
 		for server in self.servers.iter() {
 			let url = server.narinfo_url(&entry);
-			info!("Caching {:?}", &entry);
 			debug!("fetching {:?}", &url);
 			let response = reqwest::blocking::get(&url)?;
 			debug!("response: {:?}", response);
@@ -241,12 +240,17 @@ impl Client {
 		Err(anyhow!("Entry {:?} not found on any cache", entry)).context(format!("Servers: {:?}", &self.servers))
 	}
 	
-	// TODO use nix_nar for smaller closure?
 	fn extract(mut response: Response, compression: Compression, extract_to: &PathBuf) -> Result<()> {
-		let mut decompress_cmd = match compression {
+		let extractors_root = option_env!("RUNIX_EXTRACTORS_BIN");
+		let decompress_bin = match compression {
 			// TODO should this be a bundled dependency?
-			Compression::XZ => Command::new("unxz"),
+			Compression::XZ => "unxz",
 		};
+
+		let mut decompress_cmd = Command::new(match extractors_root {
+			Some(root) => PathBuf::from(root).join(decompress_bin),
+			None => PathBuf::from(decompress_bin),
+		});
 
 		decompress_cmd.stdin(Stdio::piped());
 		decompress_cmd.stdout(Stdio::piped());
@@ -256,22 +260,20 @@ impl Client {
 		let mut decompress_in = decompress.stdin.take().expect("missing pipe");
 		let decompress_out = decompress.stdout.take().expect("missing pipe");
 		
-		let mut extract_cmd = Command::new("nix-store");
-		extract_cmd.arg("--restore")
-			.arg(&extract_to)
-			.stdin(decompress_out);
-
-		debug!("+ {:?}", &extract_cmd);
-		let mut extract = extract_cmd.spawn()?;
+		let extract_to = extract_to.to_owned();
+		let unpack_thread = std::thread::spawn(move || {
+			let result: Result<()> = (|| {
+				let decoder = nix_nar::Decoder::new(decompress_out)?;
+				Ok(decoder.unpack(&extract_to)?)
+			})();
+			result
+		});
 
 		response.copy_to(&mut decompress_in)?;
 		drop(decompress_in);
 
-		let status = extract.wait()?;
-		if !status.success() {
-			return Err(anyhow!("nix-store --restore failed"));
-		}
-
+		// TODO shouldn't need unwrap, but the types are perplexing...
+		unpack_thread.join().unwrap()?;
 		Ok(())
 	}
 
@@ -298,10 +300,14 @@ impl Client {
 
 		let dest = self.paths.store_path.join(&nar_info.identity.directory);
 
+		// TODO this is a bit silly, we made the whole store path unwriteable but we still
+		// need to move the root
+		paths::util::ensure_writeable(&extract_dest)?;
 		fs::rename(&extract_dest, &dest)
 			.with_context(|| format!("moving {:?} -> {:?}", &extract_dest, &dest))?;
-		info!("Fetched: {}", nar_info.identity);
+		paths::util::ensure_unwriteable(&dest)?;
 
+		info!("Fetched: {}", nar_info.identity);
 		Ok(())
 	}
 }

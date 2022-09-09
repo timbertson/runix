@@ -80,6 +80,10 @@ pub mod util {
 	use std::os::unix::fs::PermissionsExt;
 	use std::{fs::{Metadata, self}, path::Path};
 
+	pub fn symlink_metadata<P: AsRef<Path>>(path: P) -> Result<Metadata> {
+		fs::symlink_metadata(&path).with_context(|| format!("stat: {}", path.as_ref().display()))
+	}
+
 	pub fn ensure_writeable_stat<P: AsRef<Path>>(path: P, stat: &Metadata) -> Result<()> {
 		let mut perms = stat.permissions();
 		let mode = perms.mode();
@@ -94,12 +98,12 @@ pub mod util {
 
 	pub fn ensure_writeable<P: AsRef<Path>>(path: P) -> Result<()> {
 		let path = path.as_ref();
-		ensure_writeable_stat(path, &fs::symlink_metadata(path)?)
+		ensure_writeable_stat(path, &symlink_metadata(path)?)
 	}
 
 	pub fn ensure_unwriteable<P: AsRef<Path>>(path: P) -> Result<()> {
 		let path = path.as_ref();
-		let stat = fs::symlink_metadata(path)?;
+		let stat = symlink_metadata(path)?;
 		let mut perms = stat.permissions();
 		let mode = perms.mode();
 		let unwriteable = mode & !0o222;
@@ -113,7 +117,7 @@ pub mod util {
 
 	pub fn rm_recursive<P: AsRef<Path>>(path: P) -> Result<()> {
 		let path = path.as_ref();
-		let stat = fs::symlink_metadata(path)?;
+		let stat = symlink_metadata(path)?;
 		ensure_writeable_stat(path, &stat)?;
 		if stat.is_dir() {
 			for entry in fs::read_dir(path)? {
