@@ -51,6 +51,12 @@ impl ToString for Server {
 	}
 }
 
+pub struct StoreIdentityNameDisplay<'a>(&'a StoreIdentity);
+impl<'a> Display for StoreIdentityNameDisplay<'a> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.0.pair().1.fmt(f)
+	}
+}
 
 // The directory name within /nix/store, including both the hash and the name
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -62,7 +68,16 @@ serde_from_string!(StoreIdentity);
 
 impl StoreIdentity {
 	pub fn hash(&self) -> &str {
-		self.directory.split('-').next().unwrap_or_else(|| panic!("empty split"))
+		self.pair().0
+	}
+
+	fn pair(&self) -> (&str, &str) {
+		self.directory.split_once('-')
+			.unwrap_or_else(|| panic!("Invalid store identity: {}", &self.directory))
+	}
+
+	fn display_name(&self) -> StoreIdentityNameDisplay<'_> {
+		StoreIdentityNameDisplay(&self)
 	}
 }
 
@@ -307,7 +322,7 @@ impl Client {
 			.with_context(|| format!("moving {:?} -> {:?}", &extract_dest, &dest))?;
 		paths::util::ensure_unwriteable(&dest)?;
 
-		info!("Fetched: {}", nar_info.identity);
+		info!("Fetched {}", nar_info.identity.display_name());
 		Ok(())
 	}
 }
