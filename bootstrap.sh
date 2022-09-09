@@ -8,12 +8,25 @@ _() {
 	if [ -n "${LOCAL_BOOTSTRAP:-}" ]; then
 		cp "$LOCAL_BOOTSTRAP/$FILENAME" "$TMP_TAR"
 	else
+		echo >&2 "[runix-bootstrap] Downloading ..."
 		echo "TODO: download"
 	fi
-	rm -rf "$TMP_DEST"
+
+	if [ -e "$TMP_DEST" ]; then
+		chmod -R +w "$TMP_DEST"
+		rm -rf "$TMP_DEST"
+	fi
+
+	echo >&2 "[runix-bootstrap] extracting ..."
 	mkdir -p "$TMP_DEST"
 	tar xzf "$TMP_TAR" -C "$TMP_DEST"
+	rm -f "$TMP_TAR"
+
 	ln -sfn "$TMP_DEST/store" /tmp/runix
-	"$TMP_DEST/runix" --self-install "$TMP_DEST/store-identity"
+	echo >&2 "[runix-bootstrap] Running self-install ..."
+	"$TMP_DEST/runix" --self-install "$TMP_DEST/wrapper"
+
+	echo >&2 "[runix-bootstrap] Cleaning up ..."
+	rm -f "$TMP_DEST"
 }
 _

@@ -40,8 +40,8 @@ impl PlatformExec {
 	pub fn set_entrypoint(&mut self, entrypoint: Entrypoint) {
 		self.exec = Some(entrypoint)
 	}
-
-	pub fn exec<'a, I: Iterator<Item=String>>(&self, client: &cache::Client, paths: &RuntimePaths, mut args: I) -> Result<()> {
+	
+	fn install_symlink(paths: &RuntimePaths) -> Result<()> {
 		let tmp_symlink = Path::new(paths.rewrite.tmp_dest);
 		let dest_store = &paths.store_path;
 		// TODO: don't bother if it's already correct?
@@ -51,7 +51,10 @@ impl PlatformExec {
 			fs::remove_file(tmp_symlink)?;
 			symlink(&dest_store, tmp_symlink)?;
 		}
+		Ok(())
+	}
 
+	pub fn exec<'a, I: Iterator<Item=String>>(&self, client: &cache::Client, paths: &RuntimePaths, mut args: I) -> Result<()> {
 		let mut requirement_paths = Vec::new();
 
 		for req in self.requirements.iter().chain(self.exec.iter().map(|x| &x.derivation)) {
@@ -85,6 +88,7 @@ impl PlatformExec {
 		// let inject = concat!(env!("CARGO_MANIFEST_DIR"), "/../target/debug/librunix_inject.dylib");
 		// debug!("Injecting: {:?}", inject);
 		
+		Self::install_symlink(paths)?;
 		Err(cmd
 			// .env("DYLD_INSERT_LIBRARIES", inject)
 			// .env("DYLD_FORCE_FLAT_NAMESPACE", "1")
