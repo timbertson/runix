@@ -209,7 +209,7 @@ OPTIONS:
 				save_to = Some(mandatory_next_arg("--save value", &mut args)?);
 			} else if argstr == "--platform" {
 				args.next();
-				platform = Platform::from_str(&mandatory_next_arg("--entrypoint derivation", &mut args)?)?;
+				platform = Platform::from_str(&mandatory_next_arg("--platform value", &mut args)?)?;
 			} else if argstr == "--entrypoint" {
 				args.next();
 				let derivation = cache::StoreIdentity::from(mandatory_next_arg("--entrypoint derivation", &mut args)?);

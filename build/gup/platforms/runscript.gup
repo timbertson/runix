@@ -1,0 +1,7 @@
+#!bash -eu
+for platform in $(cat ../platform-list); do
+	gup -u "$platform/bootstrap"
+done
+
+set -x
+../../target/debug/runix --merge-into "$1" $(cat ../platform-list | sed -e 's@$@/bootstrap-dir/wrapper@')

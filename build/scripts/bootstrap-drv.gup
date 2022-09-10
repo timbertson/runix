@@ -19,6 +19,7 @@ else
 
 	# It'd be nice to have anonymous IDs, but this label shouldn't clash
 	IMAGE_LABEL="$(echo runix-builder-$PLATFORM | tr '[:upper:]' '[:lower:]')"
+	# TODO pass in arch, we're just assuming right now
 	docker build -q -t "$IMAGE_LABEL" --build-arg "HOST_UID=$HOST_UID" -f ../../../Dockerfile.builder .
 	set -x
 	docker run --rm \

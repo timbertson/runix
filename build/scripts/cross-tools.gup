@@ -5,7 +5,8 @@ gup -u ../../nix/nixpkgs-stable.path
 nixpkgs_stable="$(cat ../../nix/nixpkgs-stable.path)"
 
 function cross_store_path {
-	# Calculate nix's store path on the target architecture:
+	# Calculate a store path on the target architecture:
+	# TODO pass in arch to docker run
 	store_path="$(docker run --rm \
 		-v "$nixpkgs_stable:/nixpkgs-stable" \
 		nixos/nix \

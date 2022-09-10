@@ -14,10 +14,11 @@ pub enum OS {
 impl FromStr for OS {
 	type Err = anyhow::Error;
 
+	// We align with rust OS names, but to work with `uname` we also accept "Darwin" for macOS
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
 			"Linux" => Ok(Self::Linux),
-			"macOS" => Ok(Self::macOS),
+			"macOS" | "Darwin" => Ok(Self::macOS),
 			other => Err(anyhow!("Unknown OS: {}", other))
 		}
 	}
@@ -106,7 +107,7 @@ impl Platform {
 
 impl ToString for Platform {
 	fn to_string(&self) -> String {
-		format!("{}-{}", self.arch, self.os)
+		format!("{}-{}", self.os, self.arch)
 	}
 }
 
@@ -115,8 +116,8 @@ impl FromStr for Platform {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let mut parts = s.split('-');
-		let arch = parts.next();
 		let os = parts.next();
+		let arch = parts.next();
 		let more = parts.next();
 		match (arch, os, more) {
 			(Some(arch), Some(os), None) => Ok(Self {

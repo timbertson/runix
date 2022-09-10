@@ -1,6 +1,2 @@
 #!bash -eu
-gup -u \
-	Darwin-x86_64/archive \
-	Linux-x86_64/archive \
-	;
-# TODO: darwin--arch64
+gup -u $(cat ../../platform-list | sed -e 's@$@/archive@')
