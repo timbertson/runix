@@ -24,3 +24,10 @@
 
 ./scripts/cross-tools.gup:
 	platforms/*/cross-tools
+
+# universal builder
+builder:
+	platforms/*/build-test
+
+builder.gup:
+	builder

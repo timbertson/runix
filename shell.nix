@@ -1,6 +1,7 @@
 let
 	pkgs = import <nixpkgs> {
 	};
+	sources = import ./nix/sources.nix {};
 in
 with pkgs;
 mkShell {
@@ -11,7 +12,12 @@ mkShell {
 		rust-analyzer # IDE
 		libiconv curl # native libs
 		cachix
-		gup
+
+		# gup # TODO: use upstream when v0.8.2 is released
+		(let base = pkgs.callPackage "${sources.gup}/nix/gup-python.nix" {};
+			in base.overrideAttrs (_: { src = sources.gup; })
+		)
+
 		git
 		] ++ (
 		lib.optionals stdenv.isDarwin (with darwin.apple_sdk; [

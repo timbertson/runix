@@ -10,5 +10,17 @@
         "type": "tarball",
         "url": "https://github.com/timbertson/fetlock/archive/2bb748cee7e50fa6338c529c9224b6d084492162.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "gup": {
+        "branch": "master",
+        "description": "A better make, inspired by djb's redo.",
+        "homepage": null,
+        "owner": "timbertson",
+        "repo": "gup",
+        "rev": "version-0.8.2",
+        "sha256": "0kacr541xbzprps5g4zx5n8fa65qapnl7gxszp1i52mjqv382g2r",
+        "type": "tarball",
+        "url": "https://github.com/timbertson/gup/archive/version-0.8.2.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
