@@ -1,8 +1,5 @@
-// TODO: convert more goals into this script?
-
 use std::env;
 use std::fs;
-use std::os::unix::fs::symlink;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
@@ -46,6 +43,12 @@ const RUNIX_BIN: &'static str = "../target/debug/runix";
 struct Buildable {
 	platform: String,
 	name: String,
+}
+
+impl Buildable {
+	pub fn path(&mut self) -> String {
+		format!("platforms/{}/{}", &self.platform, &self.name)
+	}
 }
 
 #[derive(Debug)]
@@ -101,7 +104,7 @@ impl Target {
 					platform: current_platform(),
 					name: self.buildable.name.clone(),
 				};
-				self.child(real).build();
+				Dependency::new(real).build();
 			},
 			_ => {
 
@@ -111,11 +114,13 @@ impl Target {
 						self.always_rebuild();
 						// TODO: cross-platform docker stuff
 						let mut cmd = Command::new("nix-build");
-						cmd.arg("../").arg("--out-link").arg(self.output);
+						cmd.arg("../").arg("--out-link").arg(&self.output);
 						run(cmd);
+						run_ref(Command::new("gup").arg("--contents").arg(&self.output));
 					},
 
 					"bootstrap.dir" => {
+						// TODO this could be a temporary dir, we only need it to build the .tgz
 						let drv = self.dependency("bootstrap.drv").read_link();
 						let store_path = self.output.join("store");
 						fs::create_dir_all(&store_path).unwrap();
@@ -123,7 +128,7 @@ impl Target {
 						cmd.arg("--query").arg("--requisites").arg(&drv);
 						for req in run_output(cmd).trim().split('\n') {
 							let dest = store_path.join(drop_store_prefix(req));
-							run_ref(Command::new("cp").arg("-a").arg(dest));
+							run_ref(Command::new("cp").arg("-a").arg(req).arg(dest));
 						}
 
 						let store_identity = drop_store_prefix(&drv);
@@ -139,41 +144,40 @@ impl Target {
 						);
 					},
 					
-					"bootstrap.tgz" => {
-						let dir = self.dependency("bootstrap.dir").path();
-						run_ref(Command::new("tar")
-							.arg("czf").arg(&self.output)
-							.current_dir(dir)
-						);
-					},
-
 					"bootstrap" => {
 						// build archive + push to cachix
-						self.dependency("bootstrap.tgz").build();
+						self.dependency(self.tarball_path()).build();
 						run_ref(Command::new("cachix").arg("push").arg("runix").arg(self.dependency("bootstrap.drv").read_link()));
 					},
-					_ => unknown()
+
+					other => {
+						// only build a tarball when the tarball name matches the desired platform
+						if other == self.tarball_path() {
+							let dir = self.dependency("bootstrap.dir").path();
+							let contents = fs::read_dir(&dir).expect("readdir").map(|e| e.unwrap().file_name().to_str().unwrap().to_owned());
+							run_ref(Command::new("tar")
+								.arg("czf").arg(&self.output).args(contents)
+								.current_dir(dir)
+							);
+						} else {
+							unknown()
+						}
+					},
 				}
 			},
 		}
 	}
 	
-	pub fn stdout_to_output(&self, mut cmd: Command) {
-		let dest = fs::OpenOptions::new().write(true).create(true).open(&self.output).expect("open output");
-		cmd.stdout(dest);
-		run(cmd);
+	fn tarball_path(&self) -> String {
+		format!("runix-{}.tgz", &self.buildable.platform)
 	}
-
+	
 	pub fn always_rebuild(&self) {
 		run_ref(&mut Command::new("gup").arg("--always"));
 	}
 
-	pub fn child(&self, buildable: Buildable) -> Dependency {
-		Dependency::new(self, buildable)
-	}
-
 	pub fn dependency<S: ToString>(&self, name: S) -> Dependency {
-		self.child(Buildable {
+		Dependency::new(Buildable {
 			platform: self.buildable.platform.clone(),
 			name: name.to_string(),
 		})
@@ -182,27 +186,21 @@ impl Target {
 
 #[derive(Debug)]
 #[must_use]
-struct Dependency<'a> {
-	parent: &'a Target,
+struct Dependency {
 	buildable: Buildable,
 	built: bool,
 }
 
-impl<'a> Dependency<'a> {
-	pub fn new(parent: &'a Target, buildable: Buildable) -> Self {
-		Self { parent, buildable, built: false }
+impl Dependency {
+	pub fn new(buildable: Buildable) -> Self {
+		Self { buildable, built: false }
 	}
 
 	pub fn build(&mut self) {
 		if !self.built {
-			todo!();
-			// self.built = true;
+			run_ref(Command::new("gup").arg("-u").arg(self.buildable.path()));
+			self.built = true;
 		}
-	}
-
-	pub fn contents(mut self) -> String {
-		self.build();
-		todo!()
 	}
 
 	pub fn read_link(mut self) -> String {
@@ -211,7 +209,6 @@ impl<'a> Dependency<'a> {
 
 	pub fn path(&mut self) -> String {
 		self.build();
-		format!("platforms/{}/{}", &self.buildable.platform, &self.buildable.name)
+		self.buildable.path()
 	}
-	
 }

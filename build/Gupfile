@@ -4,31 +4,15 @@
 ./make-wrapper.sh:
 	wrappers/*
 
-./scripts/platform-archive.gup:
-	platforms/*/runix-*.tgz
-
-./scripts/archive.gup:
-	platforms/*/archive
-
+# TODO move to builder
 ./scripts/bootstrap-drv.gup:
 	platforms/*/bootstrap-drv
-
-./scripts/bootstrap-dir.gup:
-	platforms/*/bootstrap-dir
-
-./scripts/bootstrap-archive.gup:
-	platforms/*/bootstrap-archive
-
-./scripts/bootstrap.gup:
-	platforms/*/bootstrap
 
 ./scripts/cross-tools.gup:
 	platforms/*/cross-tools
 
-# universal builder
 builder:
-	platforms/*/build-test
-	platforms/*/bootstrap.drv
+	platforms/*/*
 
 builder.gup:
 	builder

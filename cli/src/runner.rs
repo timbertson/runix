@@ -126,7 +126,8 @@ impl RunScript {
 				.truncate(true)
 				.create(true)
 				.open(path)?;
-			self.write(dest)
+			self.write(dest)?;
+			paths::util::ensure_executable(path)
 		}
 	}
 

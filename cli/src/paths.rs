@@ -115,6 +115,20 @@ pub mod util {
 		ensure_writeable_stat(path, &symlink_metadata(path)?)
 	}
 
+	pub fn ensure_executable<P: AsRef<Path>>(path: P) -> Result<()> {
+		let path = path.as_ref();
+		let stat = symlink_metadata(path)?;
+		let mut perms = stat.permissions();
+		let mode = perms.mode();
+		let executable = mode | 0o111;
+		if mode != executable {
+			debug!("making executable: {:?}", path);
+			perms.set_mode(executable);
+			fs::set_permissions(path, perms)?;
+		}
+		Ok(())
+	}
+
 	pub fn ensure_unwriteable<P: AsRef<Path>>(path: P) -> Result<()> {
 		let path = path.as_ref();
 		let stat = symlink_metadata(path)?;
