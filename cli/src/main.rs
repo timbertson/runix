@@ -53,7 +53,7 @@ pub fn main() -> Result<()> {
 
 		Some("--merge-into") => {
 			args.next();
-			let dest = mandatory_next_arg("--make-current store ID", &mut args)?;
+			let dest = mandatory_next_arg("--merge-into destination path", &mut args)?;
 			merge_into(dest, args)
 		},
 

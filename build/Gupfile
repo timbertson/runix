@@ -28,6 +28,7 @@
 # universal builder
 builder:
 	platforms/*/build-test
+	platforms/*/bootstrap.drv
 
 builder.gup:
 	builder

@@ -1,85 +1,95 @@
 # runix (working title)
 
-# Motivation / goals
+Run [nix][https://nixos.org/] software without installing nix!
 
- - run nix software without installing nix
+Nix has tremendous benefits for building, distributing and running software. As a developer, it's absolutely worth your time to install and learn nix.
 
-# Technology:
+But I'd like to distribute my software to everyone, and forcing users to first install nix can be a hurdle.
 
-First idea: LD_PRELOAD and its equivalent on OSX. I want to support linux and mac, I don't care about windows.
+`runix` is a small utility which can run nix-built software, without the complex parts of nix that make installation nontrivial:
 
-This won't support statically-linked binaries, like golang. That might be fine, as they're likely to be relocatable.
+ - nix channel & binary cache configuration
+ - build user setup
+ - root access
 
-runix -c /nix/store/xxx-yyyy foo
+# How it works:
 
- - caches the given path
- - runs `foo` with:
-   - PATH set to _cached_ store paths (x/bin forall x in closure)
-   - LD_PRELOAD set to nixr inject hook, which we pull out from next to here (realpath shenanigans?)
-     - redhook or similar (rust)
+Runix won't help you build software, just run it. It can run anything that's been pulished to a Nix binary cache.
 
-Hooking:
- - different syscalls on linux/osx
- - only need _read_ syscalls, which should be much simpler than e.g. `proot` easy. Any mutating syscall is allowed to fail, since they shouldn't be called.
-   - if we wanna be fancy we could EPERM modification syscalls when accessing /nix, but it's probably not necesary
+Each nix derivation fetched from a binary cache is a tarball with one assumption: each of its dependencies are present in `/nix/store/XXXXXXXXXX-name`. Runix rewrites all software so that it instead looks in `/tmp/runix/XXXXXXXXXX-name`. It installs a symlink to the real store path (which lives under `~/.cache/runix`). And that's it, you can build & distribute software with nix tooling, but users can run it without installing nix.
 
-# Modifications made to files
+# Using it:
 
-patchelf / install_name tool is used to modify native executables.
+## Installation:
 
-Since it's not always possible to expand a file, we alter `/nix/store` to `/tmp/runix`.
+```bash
+curl -sSL https://raw.githubusercontent.com/timbertson/runix/main/bootstrap.sh | bash
+```
 
-# Environment where binaries are run
+This will fetch runix into `~/.cache/runix`, then install a `runix` symlink into the first writeable entry on `$PATH`.
 
-`runix` performs setup before running a binary:
+## Interactive use:
 
- - ensures /tmp/runix is a symlink to the actual store path $RUNIX_ROOT/nix/store (typically ~/.cache/runix/nix/store)
-   - This is required for dynamic linking of libraries (see ./modifications.md)
- - sets LD_PRELOAD or DYLD_INSERT_LIBRARIES to inject librunix_inject.{so,dylib} into the process.
-   - This will intercept all file-related libc calls and prefix any instance of /nix/store with $RUNIX_ROOT before running the underlying call.
- - adds the directory of the executable to be run to the beginning of $PATH
+To run an abitraty derivation, you need to know its name:
 
-# Roadmap / features in order of urgency:
+**Note**: these examples use a version of `jq` for macOS x86_64, other platforms will have different derivations.
 
-Extremely vague and imaginary...
+**TODO**: multiplatform instructions
 
-### Support for custom binary caches
+```bash
+$ runix --require dfnijzy9vy1zk0waj47vvx27ffc36lbz-jq-1.6-bin jq --help
+```
 
-e.g. cachix
+## Creating & using runscripts:
 
-### Installer:
+Alternatively, you can generate a runscript:
 
-Some kind of bash monstrosity, I'm sure.
+```bash
+$ runix --save jq --entrypoint dfnijzy9vy1zk0waj47vvx27ffc36lbz-jq-1.6-bin bin/jq
+```
 
-### Distributable:
+Users with `runix` installed can execute this like any other executable:
 
-Distribute files which run via runix.
+```bash
+$ ./jq --help
+```
 
-Should they auto-bootstrap if it's not installed? It's gross, but could be very convenient.
+You can commit this into source control, anyone running it is guaranteed to run the exact same executable and all of its dependencies.
 
-### Configuration
+---
 
-Figure out what's useful. Do you want to register aliases for specific nix paths? Seems tedious and impossible to update.
+# Roadmap / possible features:
 
-Can we hook into nix channels? Hydra? Custom format linking logical names to paths?
+### Integrity checking:
 
-Let's say V1 can only run distributables, which list paths expicitly (and may optionallu have an entrypoint, docker style)
+ - Check nar files retrieved from caches
+ - Allow users to lock down allowed keys / caches?
 
-# Unanswered questions:
+### Garbage collection:
 
-## How do we resolve something logical into a nar hash?
+ - Track metadata about usage & dependencies, then GC all paths not required in the last `n` days.
 
-- embed a nix evaluator?
-  - pretty heavyweight
-  - doesn't do much without channels, which users won't have
-- could we get it from hydra? cachix?
-- pull it from some artifact store, possibly github
-  - I'd like to avoid inventing a new format, but it may be necessary
-- bake it into some distributable
-  - `nixr --generate` runs on a nix-enabled machine. You give it a bunch of expressions (and maybe even platforms?), and it generates nixr wrapper script(s) which act like a lightweight pointer to a nix shell
-  - we have to push this stuff to a cache anyway, it could be part of the same process?
-  - probably better to have a standalone JSON format, but this generated script could embed such a thing for distribution
-    - or both: a JSON file with a shebang preamble (ilke nix-run or whatever it's called)
+### Multi-user:
+
+Runix uses a hardcoded remplacement path of `/tmp/runix`. If you have multi users, that won't work. One day the path may be a hash of `runix#username` for example, which would support concurrent users. It can only be 5 characters long though, since it must replace `store` without changing the length of modified files.
+
+### Concurrent:
+
+Make downloads robust to concurrent runix processes with some sort of locking.
+
+### Figuring out store identities:
+
+It'd be nice to say I want "python" and have that calculated from e.g. `nixpkgs-stable.python`.
+
+ - something like channels?
+ - call hydra's API?
+ - embed an actual nix evaluator? This seems heavyweight
+
+For publication of runscripts, we can assume nix is installed. It'd be great to be able to evaluate the derivation path for a different platform without actually executing nix on that platform. Obviously you still need to build on that platform, but that can be a separate procss (github action or hydra builder), whereas script generation is convenient if you can simply calculate details for all platforms locally.
+
+## Self-update:
+
+ - store a runscript in the release, then provide a way to fetch this and make it current
 
 ## Caches
 
