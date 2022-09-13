@@ -1,21 +1,13 @@
+mod github;
+
 use std::env;
 use std::fmt::Debug;
 use std::fs;
-use std::io;
-use std::io::Write;
-use std::fmt;
 use std::os::unix::fs::symlink;
-use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-macro_rules! log {
-	($($tts:tt)*) => {
-		if env::var("GUP_XTRACE").ok().as_deref() == Some("1") {
-			println!($($tts)*);
-		}
-	}
-}
+use runix_build::*;
 
 pub fn main() {
 	let all_args = std::env::args();
@@ -43,19 +35,6 @@ pub fn main() {
 	target.build()
 }
 
-const RUNIX_BIN: &'static str = "../target/debug/runix";
-
-#[derive(Debug)]
-struct Buildable {
-	platform: String,
-	name: String,
-}
-
-impl Buildable {
-	pub fn path(&self) -> String {
-		format!("platforms/{}/{}", &self.platform, &self.name)
-	}
-}
 
 #[derive(Debug)]
 struct Target {
@@ -68,89 +47,6 @@ pub fn current_platform() -> String {
 	cmd.arg("-m").arg("-s");
 	let uname = run_output(cmd);
 	uname.replace(' ', "-").to_string()
-}
-
-pub fn run(mut cmd: Command) {
-	run_ref(&mut cmd);
-}
-
-pub fn drop_store_prefix(s: &str) -> &str {
-	s.strip_prefix("/nix/store/").unwrap_or_else(|| panic!("Not a store path: {}", s))
-}
-
-
-fn assert_successful(desc: CmdCensored, status: io::Result<std::process::ExitStatus>) {
-	match status.map(|st| st.success()) {
-		Ok(true) => (),
-		Ok(false) => panic!("Command failed: {:?}", &desc),
-		Err(err) => panic!("Spawn failed: {:?}", &err),
-	}
-}
-
-#[derive(Clone)]
-struct CmdCensored {
-	argv: Vec<String>,
-}
-
-impl<'a> Debug for CmdCensored {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		for arg in self.argv.iter() {
-			f.write_str(" ")?;
-			if arg.contains("Bearer") || arg.contains("Authorization") {
-				f.write_str("'*****'")?;
-			} else {
-				write!(f, "'{}'", arg)?;
-			}
-		}
-		Ok(())
-	}
-}
-fn censor(cmd: &Command) -> CmdCensored {
-	CmdCensored {
-		argv: std::iter::once(cmd.get_program()).chain(cmd.get_args())
-			.map(|s| s.to_string_lossy().to_string())
-			.collect(),
-	}
-}
-
-pub fn run_ref(cmd: &mut Command) {
-	log!("+ {:?}", censor(cmd));
-	let status = cmd.status();
-	assert_successful(censor(cmd), status)
-}
-
-pub fn run_output(mut cmd: Command) -> String {
-	run_output_ref(&mut cmd)
-}
-
-fn readlink_str<P: AsRef<Path>>(p: P) -> String {
-	fs::read_link(p.as_ref())
-		.unwrap_or_else(|err| panic!("readlink({}): {:?}", p.as_ref().display(), err))
-		.to_string_lossy().to_string()
-}
-
-pub fn run_output_ref(cmd: &mut Command) -> String {
-	let display = censor(cmd);
-	log!("+ {:?}", display);
-	cmd.stdout(Stdio::piped());
-	cmd.stderr(Stdio::inherit());
-	let output = cmd.output().expect("cmd output");
-	assert_successful(display, Ok(output.status));
-	String::from_utf8(output.stdout).expect("utf8").trim_end().to_string()
-}
-
-
-pub fn run_input_ref(input: &str, cmd: &mut Command) {
-	let display = censor(cmd);
-	log!("+ {:?}", display);
-	cmd.stdin(Stdio::piped());
-
-	let mut child = cmd.spawn().unwrap();
-	let mut stdin = child.stdin.take().unwrap();
-	write!(&mut stdin, "{}", input).unwrap();
-	drop(stdin);
-	let status = child.wait();
-	assert_successful(display, status);
 }
 
 pub fn all_platforms() -> Vec<&'static str> {
@@ -175,9 +71,20 @@ impl Target {
 						self.dependency("runscript").build()
 					},
 
+					"release" => {
+						// release all platform assets
+						for platform in all_platforms() {
+							self.platform_dependency(platform, "release").build();
+						}
+
+						// and also release the runscript:
+						let runscript_path = self.dependency("runscript").path();
+						github::Release::fetch("bootstrap").replace_asset(&runscript_path);
+					},
+
 					"runscript" => {
 						for platform in all_platforms() {
-							self.platform_dependency(platform, "bootstrap").build()
+							self.platform_dependency(platform, "bootstrap").build();
 						}
 						let wrapper_scripts = all_platforms().into_iter().map(|platform| {
 							self.platform_dependency(platform, "bootstrap.dir").path() + "/wrapper"
@@ -213,38 +120,8 @@ impl Target {
 					"release" => {
 						// TODO
 						// self.dependency("bootstrap").build();
-						
-						let curl = || {
-							let mut c = Command::new("curl");
-							c.arg("-H");
-							c.arg(format!("Authorization: Bearer {}", env::var("GITHUB_TOKEN").expect("$GITHUB_TOKEN")));
-							c.arg("-H").arg("Accept: application/vnd.github+json");
-							c
-						};
-						let release_data = run_output_ref(
-							curl().arg("https://api.github.com/repos/timbertson/runix/releases/tags/bootstrap"));
-						log!("Release data: {}", &release_data);
-
-						// Rust has JSON parsers, you know...
-						let assets_api_url = release_data.split('"')
-							.find(|token| token.ends_with("/assets"))
-							.expect("assets_url not found");
-
-						let assets_upload_url = release_data.split('"')
-							.find(|token| token.contains("/assets{?"))
-							.expect("assets_url not found").split("{").next().unwrap();
-
-						// TODO: delete existing assets for this platform
-
-						// new asset
-						let tarball = self.dependency(self.tarball_name())._path;
-						let result = run_output_ref(curl()
-							.arg("-X").arg("POST")
-							.arg("-H").arg("Content-Type: application/octet-stream")
-							.arg("--data-binary").arg(format!("@{}", tarball))
-							.arg(format!("{}?name={}", assets_upload_url, self.tarball_name()))
-						);
-						dbg!("{}", result);
+						github::Release::fetch("bootstrap")
+							.replace_asset(&self.dependency(self.tarball_name())._path);
 					},
 
 					"bootstrap" => {
@@ -408,34 +285,5 @@ impl Target {
 
 	pub fn dependency<S: ToString>(&self, name: S) -> Dependency {
 		self.platform_dependency(&self.buildable.platform, name)
-	}
-}
-
-#[derive(Debug)]
-#[must_use]
-struct Dependency {
-	_path: String,
-	built: bool,
-}
-
-impl Dependency {
-	pub fn new<S: ToString>(path: S) -> Self {
-		Self { _path: path.to_string(), built: false }
-	}
-
-	pub fn build(&mut self) {
-		if !self.built {
-			run_ref(Command::new("gup").arg("-u").arg(&self._path));
-			self.built = true;
-		}
-	}
-
-	pub fn read_link(mut self) -> String {
-		readlink_str(self.path())
-	}
-
-	pub fn path(&mut self) -> String {
-		self.build();
-		self._path.clone()
 	}
 }

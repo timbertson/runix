@@ -1,4 +1,4 @@
 #!bash -eu
-src="../builder/src/main.rs"
-gup -u "$src"
-rustc -o "$1" --edition 2021 "$src"
+gup -u ../builder/src/*.rs ../builder/Cargo.toml
+cargo build --package runix-build
+ln -sfn "../target/debug/runix-build" "$1"
