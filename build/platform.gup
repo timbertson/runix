@@ -1,3 +1,0 @@
-#!bash -eu
-gup --always
-uname -m -s | tr ' ' '-' | tee "$1" | gup --contents

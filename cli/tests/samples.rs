@@ -4,12 +4,12 @@ use itertools::Itertools;
 
 fn run_exe(pname: &str, args: Vec<&str>) -> Result<String> {
 	let mut path = PathBuf::from("../build/store-paths");
-	path.push(pname);
+	path.push(format!("{}.drv", pname));
 	assert!(Command::new("gup").arg("-u").arg(&path).spawn()?.wait()?.success());
 	let store_path = fs::read_to_string(path)?;
 
 	let mut cmd = Command::new("../target/debug/runix");
-	cmd.arg("--cache").arg(store_path.trim()).args(args);
+	cmd.arg("--require").arg(store_path.trim()).args(args);
 	cmd_output(cmd)
 }
 

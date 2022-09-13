@@ -1,4 +1,0 @@
-#!bash -eu
-gup -u nixpkgs-stable.nix
-nix-instantiate --eval nixpkgs-stable.nix -A path > "$1"
-gup --contents "$1"

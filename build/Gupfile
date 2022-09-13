@@ -4,13 +4,6 @@
 ./make-wrapper.sh:
 	wrappers/*
 
-# TODO move to builder
-./scripts/bootstrap-drv.gup:
-	platforms/*/bootstrap-drv
-
-./scripts/cross-tools.gup:
-	platforms/*/cross-tools
-
 builder:
 	platforms/*/*
 

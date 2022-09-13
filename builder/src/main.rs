@@ -1,5 +1,7 @@
 use std::env;
 use std::fs;
+use std::os::unix::fs::symlink;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
@@ -46,7 +48,7 @@ struct Buildable {
 }
 
 impl Buildable {
-	pub fn path(&mut self) -> String {
+	pub fn path(&self) -> String {
 		format!("platforms/{}/{}", &self.platform, &self.name)
 	}
 }
@@ -83,9 +85,20 @@ pub fn run_ref(cmd: &mut Command) {
 }
 
 pub fn run_output(mut cmd: Command) -> String {
+	run_output_ref(&mut cmd)
+}
+
+fn readlink_str<P: AsRef<Path>>(p: P) -> String {
+	fs::read_link(p.as_ref())
+		.unwrap_or_else(|err| panic!("readlink({}): {:?}", p.as_ref().display(), err))
+		.to_string_lossy().to_string()
+}
+
+pub fn run_output_ref(cmd: &mut Command) -> String {
 	log!("+ {:?}", cmd);
 	cmd.stdout(Stdio::piped());
-	String::from_utf8(cmd.output().expect("cmd output").stdout).expect("utf8")
+	cmd.stderr(Stdio::inherit());
+	String::from_utf8(cmd.output().expect("cmd output").stdout).expect("utf8").trim_end().to_string()
 }
 
 impl Target {
@@ -104,19 +117,97 @@ impl Target {
 					platform: current_platform(),
 					name: self.buildable.name.clone(),
 				};
-				Dependency::new(real).build();
+				Dependency::new(real.path()).build();
 			},
 			_ => {
 
 				// per-platform targets
 				match self.buildable.name.as_str() {
+					"cross-tools.dir" => {
+						// Calculate a store path on the target architecture:
+						// TODO pass in arch to docker run
+						let nixpkgs_stable = self.nixpkgs_stable();
+						let cross_store_path = |attr: &str| {
+							let store_path = run_output_ref(Command::new("docker")
+								.arg("run")
+								.arg("--rm")
+								.arg("--volume").arg(format!("{}:/nixpkgs-stable", &nixpkgs_stable))
+								.arg("nixos/nix")
+								.arg("nix-instantiate")
+								.arg("--eval")
+								.arg("/nixpkgs-stable")
+								.arg("--attr")
+								.arg(attr)
+							);
+							if store_path.is_empty() {
+								panic!("Empty store path");
+							}
+							store_path.replace('"', "")
+						};
+						let nix_drv = cross_store_path("nix.outPath");
+						fs::create_dir(&self.output).unwrap();
+						symlink(&nix_drv, self.output.join("nix")).unwrap();
+
+						// ensure the platform's nix impl is in the local runix cache
+						run_ref(Command::new(RUNIX_BIN)
+							.arg("--require").arg(drop_store_prefix(&nix_drv))
+							.arg("true")
+						);
+
+						// TERRIBLE HACK: some drvs can't be fetched with the linux implementation of
+						// nix, because it doesn't expect a case-insensitive
+						// filesystem. So pre-fetch them on the host first
+						for pname in vec!("stdenv", "ncurses", "perl") {
+							let drv = cross_store_path(&format!("{}.drvPath", pname));
+							run_ref(Command::new("nix-build").arg("--no-out-link").arg(drv));
+						}
+					},
 					"bootstrap.drv" => {
 						self.always_rebuild();
-						// TODO: cross-platform docker stuff
-						let mut cmd = Command::new("nix-build");
-						cmd.arg("../").arg("--out-link").arg(&self.output);
-						run(cmd);
-						run_ref(Command::new("gup").arg("--contents").arg(&self.output));
+						if self.buildable.platform == current_platform() {
+							log!("Building natively");
+							let mut cmd = Command::new("nix-build");
+							cmd.arg("../").arg("--out-link").arg(&self.output);
+							run(cmd);
+							run_ref(Command::new("gup").arg("--contents").arg(&self.output));
+						} else {
+							log!("Cross-building via docker");
+							let tools = PathBuf::from(self.dependency("cross-tools.dir").path());
+							let nix_drv_entry = drop_store_prefix(&readlink_str(tools.join("nix"))).to_string();
+							let uid = run_output_ref(Command::new("id").arg("-u"));
+							let cwd = env::current_dir().unwrap();
+							let root = cwd.parent().unwrap().to_str().unwrap();
+							// TODO: pass in arch, we're just assuming right now
+							// Build the base image:
+							let docker_image = run_output_ref(Command::new("docker")
+								.arg("build")
+								.arg("--quiet")
+								.arg("--build-arg").arg(format!("HOST_UID={}", &uid))
+								.arg("--file").arg("../Dockerfile.builder")
+								.arg(".")
+							);
+							let home = env::var("HOME").unwrap();
+							let drv = PathBuf::from(run_output_ref(Command::new("docker")
+								.arg("run")
+								.arg("--rm")
+								.arg("--volume").arg("/nix:/nix")
+								.arg("--volume").arg("/etc/nix:/etc/nix")
+								.arg("--volume").arg(format!("{}/.cache/runix:/host-runix", home))
+								.arg("--volume").arg(format!("{}:/nix-stable", self.nixpkgs_stable()))
+								.arg("--volume").arg(format!("{}:/app", root))
+								.arg("--env").arg("NIX_PATH=nixpkgs=/nix-stable")
+								.arg("--user").arg(uid)
+								.arg(&docker_image)
+								.arg(format!("/tmp/runix/{}/bin/nix-build", nix_drv_entry))
+								.arg("--no-out-link")
+								.arg("--argstr").arg("platform").arg(&self.buildable.platform)
+								.arg("/app")
+							));
+							if !drv.exists() {
+								panic!("Built derivation does not exist: {}", drv.display());
+							}
+							symlink(drv, &self.output).unwrap();
+						}
 					},
 
 					"bootstrap.dir" => {
@@ -146,29 +237,30 @@ impl Target {
 					
 					"bootstrap" => {
 						// build archive + push to cachix
-						self.dependency(self.tarball_path()).build();
+						self.dependency(self.tarball_name()).build();
 						run_ref(Command::new("cachix").arg("push").arg("runix").arg(self.dependency("bootstrap.drv").read_link()));
 					},
-
-					other => {
-						// only build a tarball when the tarball name matches the desired platform
-						if other == self.tarball_path() {
-							let dir = self.dependency("bootstrap.dir").path();
-							let contents = fs::read_dir(&dir).expect("readdir").map(|e| e.unwrap().file_name().to_str().unwrap().to_owned());
-							run_ref(Command::new("tar")
-								.arg("czf").arg(&self.output).args(contents)
-								.current_dir(dir)
-							);
-						} else {
-							unknown()
-						}
+					
+					other if other == self.tarball_name() => {
+						let dir = self.dependency("bootstrap.dir").path();
+						let contents = fs::read_dir(&dir).expect("readdir").map(|e| e.unwrap().file_name().to_str().unwrap().to_owned());
+						run_ref(Command::new("tar")
+							.arg("czf").arg(&self.output).args(contents)
+							.current_dir(dir)
+						);
 					},
+
+					_ => unknown(),
 				}
 			},
 		}
 	}
+
+	fn nixpkgs_stable(&self) -> String {
+		Dependency::new("./nix/nixpkgs-stable.drv").read_link()
+	}
 	
-	fn tarball_path(&self) -> String {
+	fn tarball_name(&self) -> String {
 		format!("runix-{}.tgz", &self.buildable.platform)
 	}
 	
@@ -177,38 +269,39 @@ impl Target {
 	}
 
 	pub fn dependency<S: ToString>(&self, name: S) -> Dependency {
-		Dependency::new(Buildable {
+		let buildable = Buildable {
 			platform: self.buildable.platform.clone(),
 			name: name.to_string(),
-		})
+		};
+		Dependency::new(buildable.path())
 	}
 }
 
 #[derive(Debug)]
 #[must_use]
 struct Dependency {
-	buildable: Buildable,
+	_path: String,
 	built: bool,
 }
 
 impl Dependency {
-	pub fn new(buildable: Buildable) -> Self {
-		Self { buildable, built: false }
+	pub fn new<S: ToString>(path: S) -> Self {
+		Self { _path: path.to_string(), built: false }
 	}
 
 	pub fn build(&mut self) {
 		if !self.built {
-			run_ref(Command::new("gup").arg("-u").arg(self.buildable.path()));
+			run_ref(Command::new("gup").arg("-u").arg(&self._path));
 			self.built = true;
 		}
 	}
 
 	pub fn read_link(mut self) -> String {
-		fs::read_link(self.path()).expect("readlink").to_string_lossy().to_string()
+		readlink_str(self.path())
 	}
 
 	pub fn path(&mut self) -> String {
 		self.build();
-		self.buildable.path()
+		self._path.clone()
 	}
 }

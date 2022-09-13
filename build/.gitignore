@@ -1,6 +1,4 @@
-/store-paths/*
-/platform
+*.drv
 /platforms
-/wrappers
-*.path
 /builder
+/wrappers
