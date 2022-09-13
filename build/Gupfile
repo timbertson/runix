@@ -1,11 +1,13 @@
-./compute-store-path.sh:
-	store-paths/*
+compute-store-path.sh:
+	store-paths/*.drv
 
-./make-wrapper.sh:
+make-wrapper.sh:
 	wrappers/*
 
 builder:
+	platforms/all/*
+	platforms/current/*
 	platforms/*/*
 
-builder.gup:
+gup/builder.gup:
 	builder

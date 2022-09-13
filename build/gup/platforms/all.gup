@@ -1,2 +1,0 @@
-#!bash -eu
-gup -u $(cat ../../platform-list | sed -e 's@$@/archive@')

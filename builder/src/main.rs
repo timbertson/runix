@@ -1,5 +1,9 @@
 use std::env;
+use std::fmt::Debug;
 use std::fs;
+use std::io;
+use std::io::Write;
+use std::fmt;
 use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::path::PathBuf;
@@ -63,7 +67,7 @@ pub fn current_platform() -> String {
 	let mut cmd = Command::new("uname");
 	cmd.arg("-m").arg("-s");
 	let uname = run_output(cmd);
-	uname.replace('-', "-").to_string()
+	uname.replace(' ', "-").to_string()
 }
 
 pub fn run(mut cmd: Command) {
@@ -75,13 +79,44 @@ pub fn drop_store_prefix(s: &str) -> &str {
 }
 
 
-pub fn run_ref(cmd: &mut Command) {
-	log!("+ {:?}", cmd);
-	match cmd.status().map(|st| st.success()) {
+fn assert_successful(desc: CmdCensored, status: io::Result<std::process::ExitStatus>) {
+	match status.map(|st| st.success()) {
 		Ok(true) => (),
-		Ok(false) => panic!("Command failed: {:?}", &cmd),
+		Ok(false) => panic!("Command failed: {:?}", &desc),
 		Err(err) => panic!("Spawn failed: {:?}", &err),
 	}
+}
+
+#[derive(Clone)]
+struct CmdCensored {
+	argv: Vec<String>,
+}
+
+impl<'a> Debug for CmdCensored {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		for arg in self.argv.iter() {
+			f.write_str(" ")?;
+			if arg.contains("Bearer") || arg.contains("Authorization") {
+				f.write_str("'*****'")?;
+			} else {
+				write!(f, "'{}'", arg)?;
+			}
+		}
+		Ok(())
+	}
+}
+fn censor(cmd: &Command) -> CmdCensored {
+	CmdCensored {
+		argv: std::iter::once(cmd.get_program()).chain(cmd.get_args())
+			.map(|s| s.to_string_lossy().to_string())
+			.collect(),
+	}
+}
+
+pub fn run_ref(cmd: &mut Command) {
+	log!("+ {:?}", censor(cmd));
+	let status = cmd.status();
+	assert_successful(censor(cmd), status)
 }
 
 pub fn run_output(mut cmd: Command) -> String {
@@ -95,22 +130,73 @@ fn readlink_str<P: AsRef<Path>>(p: P) -> String {
 }
 
 pub fn run_output_ref(cmd: &mut Command) -> String {
-	log!("+ {:?}", cmd);
+	let display = censor(cmd);
+	log!("+ {:?}", display);
 	cmd.stdout(Stdio::piped());
 	cmd.stderr(Stdio::inherit());
-	String::from_utf8(cmd.output().expect("cmd output").stdout).expect("utf8").trim_end().to_string()
+	let output = cmd.output().expect("cmd output");
+	assert_successful(display, Ok(output.status));
+	String::from_utf8(output.stdout).expect("utf8").trim_end().to_string()
+}
+
+
+pub fn run_input_ref(input: &str, cmd: &mut Command) {
+	let display = censor(cmd);
+	log!("+ {:?}", display);
+	cmd.stdin(Stdio::piped());
+
+	let mut child = cmd.spawn().unwrap();
+	let mut stdin = child.stdin.take().unwrap();
+	write!(&mut stdin, "{}", input).unwrap();
+	drop(stdin);
+	let status = child.wait();
+	assert_successful(display, status);
+}
+
+pub fn all_platforms() -> Vec<&'static str> {
+	vec!(
+		"Linux-x86_64",
+		"Darwin-x86_64",
+		// "Darwin-aarch64", // TODO
+	)
 }
 
 impl Target {
 	pub fn build(self) {
 		let unknown = || panic!("Unknown target: {:?}", &self.buildable);
 		match self.buildable.platform.as_str() {
+
 			"all" => {
+
 				// cross-platform targets
-				match &self.buildable.name {
-					_ => unknown()
+				match self.buildable.name.as_str() {
+					"all" => {
+						// alias
+						self.dependency("runscript").build()
+					},
+
+					"runscript" => {
+						for platform in all_platforms() {
+							self.platform_dependency(platform, "bootstrap").build()
+						}
+						let wrapper_scripts = all_platforms().into_iter().map(|platform| {
+							self.platform_dependency(platform, "bootstrap.dir").path() + "/wrapper"
+						});
+						run_ref(Command::new(RUNIX_BIN)
+							.arg("--merge-into").arg(&self.output)
+							.args(wrapper_scripts)
+						);
+					},
+
+					other => {
+						// try and build platforms/*/$TARGET
+						for platform in all_platforms() {
+							self.platform_dependency(platform, other).build()
+						}
+					},
 				}
 			},
+
 			"current" => {
 				// pseudo-target, delegate to the real target
 				let real = Buildable {
@@ -123,6 +209,137 @@ impl Target {
 
 				// per-platform targets
 				match self.buildable.name.as_str() {
+
+					"release" => {
+						// TODO
+						// self.dependency("bootstrap").build();
+						
+						let curl = || {
+							let mut c = Command::new("curl");
+							c.arg("-H");
+							c.arg(format!("Authorization: Bearer {}", env::var("GITHUB_TOKEN").expect("$GITHUB_TOKEN")));
+							c.arg("-H").arg("Accept: application/vnd.github+json");
+							c
+						};
+						let release_data = run_output_ref(
+							curl().arg("https://api.github.com/repos/timbertson/runix/releases/tags/bootstrap"));
+						log!("Release data: {}", &release_data);
+
+						// Rust has JSON parsers, you know...
+						let assets_api_url = release_data.split('"')
+							.find(|token| token.ends_with("/assets"))
+							.expect("assets_url not found");
+
+						let assets_upload_url = release_data.split('"')
+							.find(|token| token.contains("/assets{?"))
+							.expect("assets_url not found").split("{").next().unwrap();
+
+						// TODO: delete existing assets for this platform
+
+						// new asset
+						let tarball = self.dependency(self.tarball_name())._path;
+						let result = run_output_ref(curl()
+							.arg("-X").arg("POST")
+							.arg("-H").arg("Content-Type: application/octet-stream")
+							.arg("--data-binary").arg(format!("@{}", tarball))
+							.arg(format!("{}?name={}", assets_upload_url, self.tarball_name()))
+						);
+						dbg!("{}", result);
+					},
+
+					"bootstrap" => {
+						// build archive + push to cachix
+						self.dependency(self.tarball_name()).build();
+						run_ref(Command::new("cachix").arg("push").arg("runix").arg(self.dependency("bootstrap.drv").read_link()));
+					},
+					
+					// alias for the tarball name
+					"archive" => {
+						self.dependency(self.tarball_name()).build();
+					},
+
+					other if other == self.tarball_name() => {
+						let dir = self.dependency("bootstrap.dir").path();
+						let contents = fs::read_dir(&dir).expect("readdir").map(|e| e.unwrap().file_name().to_str().unwrap().to_owned());
+						run_ref(Command::new("tar")
+							.arg("czf").arg(&self.output).args(contents)
+							.current_dir(dir)
+						);
+					},
+
+					"bootstrap.dir" => {
+						// TODO this could be a temporary dir, we only need it to build the .tgz
+						let drv = self.dependency("bootstrap.drv").read_link();
+						let store_path = self.output.join("store");
+						fs::create_dir_all(&store_path).unwrap();
+						let mut cmd = Command::new("nix-store");
+						cmd.arg("--query").arg("--requisites").arg(&drv);
+						for req in run_output(cmd).trim().split('\n') {
+							let dest = store_path.join(drop_store_prefix(req));
+							run_ref(Command::new("cp").arg("-a").arg(req).arg(dest));
+						}
+
+						let store_identity = drop_store_prefix(&drv);
+						run_ref(Command::new(RUNIX_BIN).arg("--generate-bootstrap").arg(&store_path));
+						run_ref(Command::new(RUNIX_BIN)
+							.arg("--save").arg(self.output.join("wrapper"))
+							.arg("--with-cache").arg("https://runix.cachix.org")
+							.arg("--entrypoint").arg(store_identity).arg("bin/runix")
+						);
+						run_ref(Command::new("ln")
+							.arg("-sfn").arg(format!("store/{}/bin/runix", store_identity))
+							.arg(self.output.join("runix"))
+						);
+					},
+
+					"bootstrap.drv" => {
+						self.always_rebuild();
+						if self.buildable.platform == current_platform() {
+							log!("Building natively");
+							let mut cmd = Command::new("nix-build");
+							cmd.arg("../").arg("--out-link").arg(&self.output);
+							run(cmd);
+							run_input_ref(&self.output.to_str().unwrap(), Command::new("gup").arg("--contents"));
+						} else {
+							log!("Cross-building {} via docker on {}", &self.buildable.platform, current_platform());
+							let tools = PathBuf::from(self.dependency("cross-tools.dir").path());
+							let nix_drv_entry = drop_store_prefix(&readlink_str(tools.join("nix"))).to_string();
+							let uid = run_output_ref(Command::new("id").arg("-u"));
+							let cwd = env::current_dir().unwrap();
+							let root = cwd.parent().unwrap().to_str().unwrap();
+							// TODO: pass in arch, we're just assuming right now
+							// Build the base image:
+							let docker_image = run_output_ref(Command::new("docker")
+								.arg("build")
+								.arg("--quiet")
+								.arg("--build-arg").arg(format!("HOST_UID={}", &uid))
+								.arg("--file").arg("../Dockerfile.builder")
+								.arg(".")
+							);
+							let home = env::var("HOME").unwrap();
+							let drv = PathBuf::from(run_output_ref(Command::new("docker")
+								.arg("run")
+								.arg("--rm")
+								.arg("--volume").arg("/nix:/nix")
+								.arg("--volume").arg("/etc/nix:/etc/nix")
+								.arg("--volume").arg(format!("{}/.cache/runix:/host-runix", home))
+								.arg("--volume").arg(format!("{}:/nix-stable", self.nixpkgs_stable()))
+								.arg("--volume").arg(format!("{}:/app", root))
+								.arg("--env").arg("NIX_PATH=nixpkgs=/nix-stable")
+								.arg("--user").arg(uid)
+								.arg(&docker_image)
+								.arg(format!("/tmp/runix/{}/bin/nix-build", nix_drv_entry))
+								.arg("--no-out-link")
+								.arg("--argstr").arg("platform").arg(&self.buildable.platform)
+								.arg("/app")
+							));
+							if !drv.exists() {
+								panic!("Built derivation does not exist: {}", drv.display());
+							}
+							symlink(drv, &self.output).unwrap();
+						}
+					},
+					
 					"cross-tools.dir" => {
 						// Calculate a store path on the target architecture:
 						// TODO pass in arch to docker run
@@ -162,93 +379,6 @@ impl Target {
 							run_ref(Command::new("nix-build").arg("--no-out-link").arg(drv));
 						}
 					},
-					"bootstrap.drv" => {
-						self.always_rebuild();
-						if self.buildable.platform == current_platform() {
-							log!("Building natively");
-							let mut cmd = Command::new("nix-build");
-							cmd.arg("../").arg("--out-link").arg(&self.output);
-							run(cmd);
-							run_ref(Command::new("gup").arg("--contents").arg(&self.output));
-						} else {
-							log!("Cross-building via docker");
-							let tools = PathBuf::from(self.dependency("cross-tools.dir").path());
-							let nix_drv_entry = drop_store_prefix(&readlink_str(tools.join("nix"))).to_string();
-							let uid = run_output_ref(Command::new("id").arg("-u"));
-							let cwd = env::current_dir().unwrap();
-							let root = cwd.parent().unwrap().to_str().unwrap();
-							// TODO: pass in arch, we're just assuming right now
-							// Build the base image:
-							let docker_image = run_output_ref(Command::new("docker")
-								.arg("build")
-								.arg("--quiet")
-								.arg("--build-arg").arg(format!("HOST_UID={}", &uid))
-								.arg("--file").arg("../Dockerfile.builder")
-								.arg(".")
-							);
-							let home = env::var("HOME").unwrap();
-							let drv = PathBuf::from(run_output_ref(Command::new("docker")
-								.arg("run")
-								.arg("--rm")
-								.arg("--volume").arg("/nix:/nix")
-								.arg("--volume").arg("/etc/nix:/etc/nix")
-								.arg("--volume").arg(format!("{}/.cache/runix:/host-runix", home))
-								.arg("--volume").arg(format!("{}:/nix-stable", self.nixpkgs_stable()))
-								.arg("--volume").arg(format!("{}:/app", root))
-								.arg("--env").arg("NIX_PATH=nixpkgs=/nix-stable")
-								.arg("--user").arg(uid)
-								.arg(&docker_image)
-								.arg(format!("/tmp/runix/{}/bin/nix-build", nix_drv_entry))
-								.arg("--no-out-link")
-								.arg("--argstr").arg("platform").arg(&self.buildable.platform)
-								.arg("/app")
-							));
-							if !drv.exists() {
-								panic!("Built derivation does not exist: {}", drv.display());
-							}
-							symlink(drv, &self.output).unwrap();
-						}
-					},
-
-					"bootstrap.dir" => {
-						// TODO this could be a temporary dir, we only need it to build the .tgz
-						let drv = self.dependency("bootstrap.drv").read_link();
-						let store_path = self.output.join("store");
-						fs::create_dir_all(&store_path).unwrap();
-						let mut cmd = Command::new("nix-store");
-						cmd.arg("--query").arg("--requisites").arg(&drv);
-						for req in run_output(cmd).trim().split('\n') {
-							let dest = store_path.join(drop_store_prefix(req));
-							run_ref(Command::new("cp").arg("-a").arg(req).arg(dest));
-						}
-
-						let store_identity = drop_store_prefix(&drv);
-						run_ref(Command::new(RUNIX_BIN).arg("--generate-bootstrap").arg(&store_path));
-						run_ref(Command::new(RUNIX_BIN)
-							.arg("--save").arg(self.output.join("wrapper"))
-							.arg("--with-cache").arg("https://runix.cachix.org")
-							.arg("--entrypoint").arg(store_identity).arg("bin/runix")
-						);
-						run_ref(Command::new("ln")
-							.arg("-sfn").arg(format!("store/{}/bin/runix", store_identity))
-							.arg(self.output.join("runix"))
-						);
-					},
-					
-					"bootstrap" => {
-						// build archive + push to cachix
-						self.dependency(self.tarball_name()).build();
-						run_ref(Command::new("cachix").arg("push").arg("runix").arg(self.dependency("bootstrap.drv").read_link()));
-					},
-					
-					other if other == self.tarball_name() => {
-						let dir = self.dependency("bootstrap.dir").path();
-						let contents = fs::read_dir(&dir).expect("readdir").map(|e| e.unwrap().file_name().to_str().unwrap().to_owned());
-						run_ref(Command::new("tar")
-							.arg("czf").arg(&self.output).args(contents)
-							.current_dir(dir)
-						);
-					},
 
 					_ => unknown(),
 				}
@@ -268,12 +398,16 @@ impl Target {
 		run_ref(&mut Command::new("gup").arg("--always"));
 	}
 
-	pub fn dependency<S: ToString>(&self, name: S) -> Dependency {
+	pub fn platform_dependency<S1: ToString, S2: ToString>(&self, platform: S1, name: S2) -> Dependency {
 		let buildable = Buildable {
-			platform: self.buildable.platform.clone(),
+			platform: platform.to_string(),
 			name: name.to_string(),
 		};
 		Dependency::new(buildable.path())
+	}
+
+	pub fn dependency<S: ToString>(&self, name: S) -> Dependency {
+		self.platform_dependency(&self.buildable.platform, name)
 	}
 }
 
