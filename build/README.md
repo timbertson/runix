@@ -1,25 +1,21 @@
-./store-paths/*:
+# ./store-paths/*:
 
 Each file contains a store path. This is per-system; i.e. their contents will differ across platforms.
 
 But for a given platform; they should be stable since nixpkgs is pinned.
 
-`gup -u store-paths/foo` will calculate the path (requires nix) but not actually download it. This lets us pass it to runix, and generally the store path won't exist on the host system even if nix is installed.
+`gup -u store-paths/foo.drv` will calculate the path (requires nix) but not actually download it. This lets us pass it to runix, and generally the store path won't exist on the host system even if nix is installed.
 
-# bootstrap-*
+# ./wrappers/*:
 
-Bootstrap-dir contains the built and transformed store paths for the current platform.
+Runscript wrappers built from the corresponding store-path.
 
-To test a bootstrap without going full tarball, run e.g.:
+# ./platforms/$PLATFORM/$TARGET
 
-```bash
-gup build/platforms/Darwin-x86_64/bootstrap
-./target/debug/runix --self-install build/bootstrap-dir/wrapper
-```
+Build system for creating the cross-platform bootstrap artifacts.
 
-And via local tarball without having to upload it:
+Useful targets:
 
-```bash
-gup build/platforms/Darwin-x86_64/bootstrap
-env LOCAL_BOOTSTRAP=build/ bash -x bootstrap.sh
-```
+ - platforms/current/bootstrap: build archive & upload to cachix
+ - platforms/current/release: as above, plus upload release assets
+ - platforms/all/release: Only works on OSX, to build all artifacts locally (using docker for other architectures)

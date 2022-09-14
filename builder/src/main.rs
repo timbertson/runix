@@ -189,6 +189,7 @@ impl Target {
 							let docker_image = run_output_ref(Command::new("docker")
 								.arg("build")
 								.arg("--quiet")
+								.arg("--platform").arg(self.docker_platform())
 								.arg("--build-arg").arg(format!("HOST_UID={}", &uid))
 								.arg("--file").arg("../Dockerfile.builder")
 								.arg(".")
@@ -197,6 +198,7 @@ impl Target {
 							let drv = PathBuf::from(run_output_ref(Command::new("docker")
 								.arg("run")
 								.arg("--rm")
+								.arg("--platform").arg(self.docker_platform())
 								.arg("--volume").arg("/nix:/nix")
 								.arg("--volume").arg("/etc/nix:/etc/nix")
 								.arg("--volume").arg(format!("{}/.cache/runix:/host-runix", home))
@@ -224,6 +226,7 @@ impl Target {
 						let cross_store_path = |attr: &str| {
 							let store_path = run_output_ref(Command::new("docker")
 								.arg("run")
+								.arg("--platform").arg(self.docker_platform())
 								.arg("--rm")
 								.arg("--volume").arg(format!("{}:/nixpkgs-stable", &nixpkgs_stable))
 								.arg("nixos/nix")
@@ -260,6 +263,16 @@ impl Target {
 					_ => unknown(),
 				}
 			},
+		}
+	}
+	
+	fn docker_platform(&self) -> &'static str {
+		match self.buildable.platform.as_str() {
+			"Linux-x86_64" => "linux/amd64",
+			// TODO this isn't actually a thing :(
+			// "Darwin-x86_64" => "darwin/arch64",
+			// "Darwin-aarch64" => "darwin/arm64",
+			other => panic!("Unsupported docker cross-build target: {}", other),
 		}
 	}
 

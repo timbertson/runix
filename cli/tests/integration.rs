@@ -1,4 +1,5 @@
 use anyhow::*;
+use serial_test::serial;
 use std::{process::Command, path::PathBuf, fs};
 use itertools::Itertools;
 
@@ -89,6 +90,7 @@ fn test_in_temp_runix<F: FnOnce(&str) -> Result<()>>(f: F) -> Result<()> {
 
 // expensive integration tests; run with --ignored
 #[test]
+#[serial]
 #[ignore]
 fn local_bootstrap() -> Result<()> {
 	test_in_temp_runix(|root| {
@@ -108,9 +110,9 @@ fn local_bootstrap() -> Result<()> {
 }
 
 #[test]
+#[serial]
 #[ignore]
 fn remote_bootstrap() -> Result<()> {
-	// TODO check built executable works
 	test_in_temp_runix(|root| {
 		run(Command::new("bash")
 				.arg("-euxc")
