@@ -1,8 +1,9 @@
 #!bash -eu
 gup --always
 pname="$(basename "$2")"
-gup -u ./store-paths/"$pname"
-impl="$(cat ./store-paths/"$pname")"
+store_path="./store-paths/$pname.drv"
+gup -u "$store_path"
+impl="$(cat "$store_path")"
 [ -n "$impl" ]
 
 ../target/debug/runix \

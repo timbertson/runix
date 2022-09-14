@@ -4,12 +4,12 @@ _() {
 	PLATFORM="$(uname -m -s | tr ' ' '-')"
 	TMP_TAR="/tmp/runix-bootstrap.tgz"
 	TMP_DEST="/tmp/runix-bootstrap"
-	FILENAME="bootstrap-$PLATFORM.tgz"
+	FILENAME="runix-$PLATFORM.tgz"
 	if [ -n "${LOCAL_BOOTSTRAP:-}" ]; then
 		cp "$LOCAL_BOOTSTRAP/$FILENAME" "$TMP_TAR"
 	else
 		echo >&2 "[runix-bootstrap] Downloading ..."
-		echo "TODO: download"
+		curl -o "$TMP_TAR" -sSL "https://github.com/timbertson/runix/releases/download/bootstrap/$FILENAME"
 	fi
 
 	function cleanup {
