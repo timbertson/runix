@@ -121,3 +121,11 @@ fn remote_bootstrap() -> Result<()> {
 		)
 	})
 }
+
+// TODO:
+// #[test]
+// #[serial]
+// #[ignore]
+// fn linux_bootstrap() -> Result<()> {
+// 	// TODO this checks linux on darwin. There's no way to check darwin on linux :/
+// }
