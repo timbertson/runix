@@ -2,15 +2,21 @@
 	platform ? null,
 }:
 let
+	nixPlatform = builtins.getAttr platform {
+		"Darwin-aarch64" = "aarch64-apple-darwin";
+		"Darwin-x86_64" = "x86_64-apple-darwin";
+		"Linux-x86_64" = "x86_64-unknown-linux-gnu";
+	};
 	sources = import ./sources.nix {};
 
 	overlay = self: super: with super;
 	let
+		isDarwin = stdenv.hostPlatform.isDarwin;
 		fenixStable = self.fenix.stable.withComponents [ "cargo" "rustc" ];
 
-		fenix-rust = self.fenix.combine [
+		fenix-rust = if platform == null then fenixStable else self.fenix.combine [
 			fenixStable
-			self.fenix.targets.aarch64-apple-darwin.stable.rust-std
+			(builtins.getAttr nixPlatform self.fenix.targets).stable.rust-std
 		];
 
 		root = builtins.fetchGit { url = ../.; ref = "HEAD"; };
@@ -36,13 +42,13 @@ let
 			})
 		];
 
-		codesignDeps = lib.optionals stdenv.isDarwin [
+		codesignDeps = lib.optionals isDarwin [
 			# https://github.com/NixOS/nixpkgs/issues/148189
 			# buildpackages are the ones which run on the host system but produce
 			(pkgsBuildHost.darwin.cctools)
 		];
 
-		frameworkDeps = lib.optionals stdenv.isDarwin [
+		frameworkDeps = lib.optionals isDarwin [
 			darwin.apple_sdk.frameworks.Security
 			darwin.apple_sdk.frameworks.CoreFoundation
 		];
@@ -62,7 +68,6 @@ let
 								};
 							in args: buildFn (args // {
 								preConfigure = preconfigureIconvHack;
-								# TODO allow extra stuff like `extraRustcOpts` in fetlock
 								extraRustcOpts = lib.optionals
 									(lib.elem args.pname [ "serde_derive" "thiserror-impl" ])
 									[ "-C" "link-args=-L${pkgsBuildBuild.libiconv}/lib" ];
@@ -99,63 +104,31 @@ EOF
 							});
 
 					pkgs = super.pkgs // {
-						buildRustCrate = (
-							args:
-							let
-								baseBuild = super.pkgs.buildRustCrate;
-								base = baseBuild args;
-								augmented = lib.warn "HOST PLATFORM OF ${args.pname} == ${base.stdenv.hostPlatform.config} and stdenv = ${stdenv.hostPlatform.config} x ${stdenv.hostPlatform.rustc.config}" (
-									baseBuild (args // {
-										preConfigure = preconfigureIconvHack;
-										extraRustcOpts =
-											(lib.optionals
-												(lib.elem args.pname [ "serde_derive" "thiserror-impl" "runix" ])
-												[ "-C" "link-args=-L${pkgsBuildBuild.libiconv}/lib" ]
-											) ++
-											(lib.optionals
-												(args.pname == "runix" )
-												[
-													"-C" "link-args=-F${darwin.apple_sdk.frameworks.Security}/Library/Frameworks"
-													"-C" "link-args=-F${darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks"
-													"-C" "linker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}ld"
-												]
-											) ;
-										# extraLinkFlags = ["-v"];
-										# 			if stdenv.isDarwin then [
-										# 				"-C" "link-args=-F${darwin.apple_sdk.frameworks.Security}/Library/Frameworks"
-										# 				"-C" "link-args=-F${darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks"
-										# 			] else []
-										# 		)
-										# 	else []
-										# );
-									})
-								);
-							in augmented
-						);
+						buildRustCrate = args: super.pkgs.buildRustCrate (args // {
+							preConfigure = preconfigureIconvHack;
+							extraRustcOpts =
+								(lib.optionals
+									(lib.elem args.pname [ "serde_derive" "thiserror-impl" "runix" ])
+									[ "-C" "link-args=-L${pkgsBuildBuild.libiconv}/lib" ]
+								) ++
+								(lib.optionals
+									(args.pname == "runix" )
+									# TODO why isn't it enough to add these to buildInputs?
+									[
+										"-C" "link-args=-F${darwin.apple_sdk.frameworks.Security}/Library/Frameworks"
+										"-C" "link-args=-F${darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks"
+										"-C" "linker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}ld"
+									]
+								) ;
+						});
 					};
 				})
 			];
 
 			pkgOverrides = self: [
-				# (self.overrideAll (drv: drv.overrideAttrs (o: {
-				# 	buildInputs = (o.buildInputs or []) ++ [libiconv pkgsBuildBuild.libiconv];
-				# })))
-
-				# (self.overrideSpec {
-				# 	runix = (base: base // {
-				# 		extraRustcOpts =
-				# 			# TODO can we do this via smple build deps?
-				# 			# TODO this doesn't even work, is it multiple overrides?
-				# 			if stdenv.isDarwin then [
-				# 				"-C" "link-args=-F${darwin.apple_sdk.frameworks.Security}/Library/Frameworks"
-				# 				"-C" "link-args=-F${darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks"
-				# 			] else null;
-				# 	});
-				# })
-
 				(self.addBuildInputs {
-					serde_derive = [ pkgsBuildBuild.libiconv ] ++ codesignDeps;
-					runix = codesignDeps; # ++ frameworkDeps;
+					serde_derive = codesignDeps;
+					runix = codesignDeps;
 				})
 			] ++ commonPkgOverrides self;
 
@@ -164,18 +137,15 @@ EOF
 		rustc = fenix-rust;
 		cargo = fenix-rust;
 		selection = crossSelection.drvsByName;
-		# nativeSelection = nativeSelection.drvsByName;
 		runix = crossSelection.drvsByName.runix;
 	};
 in
 
-import <nixpkgs> {
-	crossSystem = {
-		config = "aarch64-apple-darwin";
-		rustc.config = "aarch64-apple-darwin";
-	};
+import <nixpkgs> ({
 	overlays = [
 		overlay
 		(import "${sources.fenix}/overlay.nix")
 	];
-}
+} // (if platform == null then {} else {
+	crossSystem.config = nixPlatform;
+}))
