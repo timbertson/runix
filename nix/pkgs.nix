@@ -13,7 +13,7 @@ let
 		# (because no cross-compiled binaries are in the binary cache)
 		nativePkgs = super;
 		
-		fenixStable = self.fenix.stable.rustc;
+		fenixStable = self.fenix.stable.withComponents [ "cargo" "rustc" ];
 
 		# cross contains both a `pkgs` package set as well as a rust which can build for the target arch
 		cross = if platform == null then {
@@ -63,13 +63,27 @@ let
 		makeSelection = fetlock.cargo.load (./lock + "/${if platform == null then "current" else platform}.nix");
 
 		# everything selected for the build platform
-		nativeSelection = makeSelection {
-			pkgOverrides = commonPkgOverrides;
-		};
+		# nativeSelection = makeSelection {
+		# 	pkgOverrides = commonPkgOverrides;
+		# 	overlays = [
+		# 		(self: super: {
+		# 			pkgs = pkgsBuildBuild // {
+		# 				buildRustCrate = (
+		# 					super.pkgs.buildRustCrate.override {
+		# 						# stdenv = nativePkgs.stdenv // {
+		# 						# 	hostPlatform = cross.pkgs.hostPlatform;
+		# 						# };
+		# 						rustc = cross.rust;
+		# 						cargo = cross.rust;
+		# 				);
+		# 			};
+		# 		})
+		# 	];
+		# };
 
 		# build for the target platform
 		crossSelection = makeSelection {
-			overlays = [ # fetlock overlays
+			overlays = lib.warn "OVERLAYS" [ # fetlock overlays
 				(self: super: {
 					specToDrv = spec:
 						# Here we re-split deps into build / target. If it's a macro crate,
@@ -80,13 +94,15 @@ let
 								buildDependencies = map nativeSelection.getDrv (spec.buildDepKeys or []);
 							});
 
-					pkgs = super.pkgs // {
+					pkgs = lib.warn "PKGS?" (super.pkgs // {
 						buildRustCrate = (
-							args: super.pkgs.buildRustCrate.override {
+							args: lib.warn "BRCrate! ${args.pname}" (super.pkgs.buildRustCrate.override {
 								# fake stdenv just for buildRustCrate. This causes it to pass the relevant --target flag everwhere
-								stdenv = nativePkgs.stdenv // {
-									hostPlatform = cross.pkgs.hostPlatform;
-								};
+								# stdenv = nativePkgs.stdenv // {
+								# 	hostPlatform = cross.pkgs.hostPlatform;
+								# };
+								rustc = cross.rust;
+								cargo = cross.rust;
 							} (args // {
 								extraRustcOpts = ["-C" "linker=${cross.pkgs.stdenv.cc}/bin/${cross.pkgs.stdenv.cc.targetPrefix}ld"] ++ (
 									if args.pname == "runix" then
@@ -100,8 +116,9 @@ let
 									else []
 								);
 							})
+							)
 						);
-					};
+					});
 				})
 			];
 
@@ -114,8 +131,13 @@ let
 
 		};
 	in {
+		# Note: these are focefully taken from pkgsBuildBuild (i.e. fully native), because fenix
+		# lets us add target platforms without needing to rely on pkgsCross
+		rust = cross.rust;
 		rustc = cross.rust;
-		selection = crossSelection.drvsByName;
+		cargo = cross.rust;
+
+		selection = lib.warn "SOME ONE" crossSelection.drvsByName;
 		nativeSelection = nativeSelection.drvsByName;
 		runix = crossSelection.drvsByName.runix;
 	};
