@@ -3,7 +3,6 @@ mod github;
 use std::env;
 use std::fmt::Debug;
 use std::fs;
-use std::os::unix::fs::symlink;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
@@ -171,113 +170,24 @@ impl Target {
 
 					"bootstrap.drv" => {
 						self.always_rebuild();
+						let mut cmd = Command::new("nix-build");
+
 						if self.buildable.platform == current_platform() {
-							log!("Building natively");
-							let mut cmd = Command::new("nix-build");
-							cmd.arg("../").arg("--out-link").arg(&self.output);
-							run(cmd);
-							run_input_ref(&self.output.to_str().unwrap(), Command::new("gup").arg("--contents"));
+							log!("Building current platform");
+							cmd.arg("--arg").arg("platform").arg("null");
 						} else {
-							log!("Cross-building {} via docker on {}", &self.buildable.platform, current_platform());
-							let tools = PathBuf::from(self.dependency("cross-tools.dir").path());
-							let nix_drv_entry = drop_store_prefix(&readlink_str(tools.join("nix"))).to_string();
-							let uid = run_output_ref(Command::new("id").arg("-u"));
-							let cwd = env::current_dir().unwrap();
-							let root = cwd.parent().unwrap().to_str().unwrap();
-							// TODO: pass in arch, we're just assuming right now
-							// Build the base image:
-							let docker_image = run_output_ref(Command::new("docker")
-								.arg("build")
-								.arg("--quiet")
-								.arg("--platform").arg(self.docker_platform())
-								.arg("--build-arg").arg(format!("HOST_UID={}", &uid))
-								.arg("--file").arg("../Dockerfile.builder")
-								.arg(".")
-							);
-							let home = env::var("HOME").unwrap();
-							let drv = PathBuf::from(run_output_ref(Command::new("docker")
-								.arg("run")
-								.arg("--rm")
-								.arg("--platform").arg(self.docker_platform())
-								.arg("--volume").arg("/nix:/nix")
-								.arg("--volume").arg("/etc/nix:/etc/nix")
-								.arg("--volume").arg(format!("{}/.cache/runix:/host-runix", home))
-								.arg("--volume").arg(format!("{}:/nix-stable", self.nixpkgs_stable()))
-								.arg("--volume").arg(format!("{}:/app", root))
-								.arg("--env").arg("NIX_PATH=nixpkgs=/nix-stable")
-								.arg("--user").arg(uid)
-								.arg(&docker_image)
-								.arg(format!("/tmp/runix/{}/bin/nix-build", nix_drv_entry))
-								.arg("--no-out-link")
-								.arg("--argstr").arg("platform").arg(&self.buildable.platform)
-								.arg("/app")
-							));
-							if !drv.exists() {
-								panic!("Built derivation does not exist: {}", drv.display());
-							}
-							symlink(drv, &self.output).unwrap();
+							log!("Cross-building for {:}", &self.buildable.platform);
+							cmd.arg("--argstr").arg("platform").arg(&self.buildable.platform);
 						}
-					},
-					
-					"cross-tools.dir" => {
-						// Calculate a store path on the target architecture:
-						// TODO pass in arch to docker run
-						let nixpkgs_stable = self.nixpkgs_stable();
-						let cross_store_path = |attr: &str| {
-							let store_path = run_output_ref(Command::new("docker")
-								.arg("run")
-								.arg("--platform").arg(self.docker_platform())
-								.arg("--rm")
-								.arg("--volume").arg(format!("{}:/nixpkgs-stable", &nixpkgs_stable))
-								.arg("nixos/nix")
-								.arg("nix-instantiate")
-								.arg("--eval")
-								.arg("/nixpkgs-stable")
-								.arg("--attr")
-								.arg(attr)
-							);
-							if store_path.is_empty() {
-								panic!("Empty store path");
-							}
-							store_path.replace('"', "")
-						};
-						let nix_drv = cross_store_path("nix.outPath");
-						fs::create_dir(&self.output).unwrap();
-						symlink(&nix_drv, self.output.join("nix")).unwrap();
-
-						// ensure the platform's nix impl is in the local runix cache
-						run_ref(Command::new(RUNIX_BIN)
-							.arg("--require").arg(drop_store_prefix(&nix_drv))
-							.arg("true")
-						);
-
-						// TERRIBLE HACK: some drvs can't be fetched with the linux implementation of
-						// nix, because it doesn't expect a case-insensitive
-						// filesystem. So pre-fetch them on the host first
-						for pname in vec!("stdenv", "ncurses", "perl") {
-							let drv = cross_store_path(&format!("{}.drvPath", pname));
-							run_ref(Command::new("nix-build").arg("--no-out-link").arg(drv));
-						}
+						cmd.arg("../").arg("--out-link").arg(&self.output);
+						run(cmd);
+						run_input_ref(&self.output.to_str().unwrap(), Command::new("gup").arg("--contents"));
 					},
 
 					_ => unknown(),
 				}
 			},
 		}
-	}
-	
-	fn docker_platform(&self) -> &'static str {
-		match self.buildable.platform.as_str() {
-			"Linux-x86_64" => "linux/amd64",
-			// TODO this isn't actually a thing :(
-			// "Darwin-x86_64" => "darwin/arch64",
-			// "Darwin-aarch64" => "darwin/arm64",
-			other => panic!("Unsupported docker cross-build target: {}", other),
-		}
-	}
-
-	fn nixpkgs_stable(&self) -> String {
-		Dependency::new("./nix/nixpkgs-stable.drv").read_link()
 	}
 	
 	fn tarball_name(&self) -> String {

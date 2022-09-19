@@ -1,6 +1,4 @@
-{
-	platform ? null,
-}:
+{ platform ? null }:
 let
 	nixPlatform = builtins.getAttr platform {
 		"Darwin-aarch64" = "aarch64-apple-darwin";
@@ -25,7 +23,7 @@ let
 			version = "1";
 			buildCommand = ''
 				mkdir -p "$out/bin"
-				cp -a --dereference "${xz}/bin/xz" "$out/bin"
+				cp -a --dereference "${xz}/bin/xz" "$out/bin/unxz"
 			'';
 		};
 		
@@ -71,7 +69,7 @@ let
 		rustc = self.fenix-rust;
 		cargo = self.fenix-rust;
 		runix = {
-			inherit makeSelection selection root commonPkgOverrides isDarwin;
+			inherit makeSelection selection root commonPkgOverrides isDarwin extractors;
 
 			codesignDeps = lib.optionals isDarwin [
 				# https://github.com/NixOS/nixpkgs/issues/148189

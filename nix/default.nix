@@ -1,1 +1,2 @@
-(import ./pkgs.nix {}).runix.selection.drvsByName.runix
+{ platform ? null }:
+(import ./pkgs.nix { inherit platform; }).runix.selection.drvsByName.runix
