@@ -1,1 +1,1 @@
-(import ./pkgs.nix {}).runix
+(import ./pkgs.nix {}).runix.selection.drvsByName.runix

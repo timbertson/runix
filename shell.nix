@@ -17,7 +17,6 @@ mkShell {
 		(let base = pkgs.callPackage "${sources.gup}/nix/gup-python.nix" {};
 			in base.overrideAttrs (_: { src = sources.gup; })
 		)
-
 		git
 		] ++ (
 		lib.optionals stdenv.isDarwin (with darwin.apple_sdk; [

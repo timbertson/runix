@@ -2,151 +2,204 @@
 	platform ? null,
 }:
 let
+	nixPlatform = builtins.getAttr platform {
+		"Darwin-aarch64" = "aarch64-apple-darwin";
+		"Darwin-x86_64" = "x86_64-apple-darwin";
+		"Linux-x86_64" = "x86_64-unknown-linux-gnu";
+	};
 	sources = import ./sources.nix {};
 
-	overlay = self: super: with super;
+	### baseOverlay:
+	# provides the base runix overlay, including fenix, wrappers + rust crates
+	baseOverlay = self: super: with super;
 	let
-		# for the most part we use `super`, which is just the regular nix environment.
-		# We could use a cross environment for everything, but our needs are minimal
-		# and I couldn't get that building...
-		# Our runtime dependencies are minimal, and this saves us having to build everything ourselves
-		# (because no cross-compiled binaries are in the binary cache)
-		nativePkgs = super;
-		
-		fenixStable = self.fenix.stable.withComponents [ "cargo" "rustc" ];
-
-		# cross contains both a `pkgs` package set as well as a rust which can build for the target arch
-		cross = if platform == null then {
-			pkgs = self;
-			rust = fenixStable;
-		} else builtins.getAttr platform {
-			"Darwin-aarch64" = {
-				pkgs = nativePkgs.pkgsCross.aarch64-darwin;
-				rust = self.fenix.combine [ fenixStable self.fenix.targets.aarch64-apple-darwin.stable.rust-std ];
-			};
-
-			"Darwin-x86_64" = {
-				pkgs = nativePkgs.pkgsCross.x86_64-darwin;
-				rust = self.fenix.combine [ fenixStable self.fenix.targets.x86_64-apple-darwin.stable.rust-std ];
-			};
-		};
-
+		isDarwin = stdenv.hostPlatform.isDarwin;
+		fenix-rust = self.fenix.stable.withComponents [ "cargo" "rustc" ];
 		root = builtins.fetchGit { url = ../.; ref = "HEAD"; };
 		fetlock = (callPackage sources.fetlock {});
 
 		# extractors just contains exact binaries needed, to reduce
 		# closure size by avoiding e.g. bash dependency
-		runix-extractors = stdenv.mkDerivation {
+		extractors = stdenv.mkDerivation {
 			pname = "runix-extract";
 			version = "1";
 			buildCommand = ''
 				mkdir -p "$out/bin"
-				cp -a --dereference "${cross.pkgs.xz}/bin/xz" "$out/bin"
+				cp -a --dereference "${xz}/bin/xz" "$out/bin"
 			'';
 		};
 		
-		commonPkgOverrides = self: [
-			(self.overrideAttrs {
+		makeSelection = fetlock.cargo.load (./lock + "/${if platform == null then "current" else platform}.nix");
+		
+		frameworkDeps = lib.optionals isDarwin [
+			darwin.apple_sdk.frameworks.Security
+			darwin.apple_sdk.frameworks.CoreFoundation
+		];
+
+		commonPkgOverrides = api: [
+			(api.overrideAttrs {
 				runix = base: {
-					RUNIX_EXTRACTORS_BIN="${runix-extractors}/bin";
+					RUNIX_EXTRACTORS_BIN="${extractors}/bin";
 					src = "${root}/cli";
+					buildInputs = (super.buildInputs or []) ++ frameworkDeps ++ [ libiconv ];
 				};
 			})
+		] ++ lib.optionals (stdenv.buildPlatform.isDarwin && stdenv.hostPlatform.isLinux)
+		[
+			(api.overrideAll (drv: drv.overrideAttrs (base:
+				if base.passthru.spec.procMacro or false then {
+					# buildRustCrate is not cross-aware, so it tries to specify a .so location when building on
+					# darwin and targeting linux. Hack it up so that it's search path finds a .so
+					# NOTE: this just stops it blowing up, we also add need to add the .dylib path (done later)
+					postFixup = ''
+						if [ -e "$lib/lib" ]; then
+							pushd $lib/lib
+								for lib in *.dylib; do
+									# ln -s "$lib" "$(basename "$lib" .dylib)".so
+									cp -a "$lib" "$(basename "$lib" .dylib)".so
+								done
+							popd
+						fi
+					'';
+				} else {}
+			)))
 		];
+		
+		selection = makeSelection { pkgOverrides = commonPkgOverrides; };
+	in {
+		inherit fenix-rust;
+		rustc = self.fenix-rust;
+		cargo = self.fenix-rust;
+		runix = {
+			inherit makeSelection selection root commonPkgOverrides isDarwin;
 
-		codesignDeps = lib.optionals stdenv.isDarwin [
-			# https://github.com/NixOS/nixpkgs/issues/148189
-			# buildpackages are the ones which run on the host system but produce
-			(cross.pkgs.buildPackages.darwin.cctools)
-		];
+			codesignDeps = lib.optionals isDarwin [
+				# https://github.com/NixOS/nixpkgs/issues/148189
+				pkgsBuildHost.darwin.cctools
+			];
+		};
+	};
 
-		makeSelection = fetlock.cargo.load (./lock + "/${if platform == null then "current" else platform}.nix");
-
-		# everything selected for the build platform
-		# nativeSelection = makeSelection {
-		# 	pkgOverrides = commonPkgOverrides;
-		# 	overlays = [
-		# 		(self: super: {
-		# 			pkgs = pkgsBuildBuild // {
-		# 				buildRustCrate = (
-		# 					super.pkgs.buildRustCrate.override {
-		# 						# stdenv = nativePkgs.stdenv // {
-		# 						# 	hostPlatform = cross.pkgs.hostPlatform;
-		# 						# };
-		# 						rustc = cross.rust;
-		# 						cargo = cross.rust;
-		# 				);
-		# 			};
-		# 		})
-		# 	];
-		# };
+	### crossOverlay:
+	# Additional tweaks required to cross-build runix
+	crossOverlay = self: super: with super;
+	let
+		# Some build.rs need to link against iconv because `std` crate depends on it.
+		# TODO I don't know why it doesn't magically work, since iconv _is_ on the build
+		# inputs path. We can't put this in extraRustcOpts since that applies to the
+		# project build, but we need to affect the conigure phase (i.e. build.rs).
+		# Here's a hack which prepopulates some stuff used by
+		# build-rust-crate/configure-crate.nix
+		preconfigureIconvHack = ''
+			mkdir -p target
+			cat <<EOF >> target/link.build
+				-C link-args=-L${pkgsBuildBuild.libiconv}/lib
+EOF
+		'';
+		
+		isBuildingOnDarwinForLinux = stdenv.buildPlatform.isDarwin && stdenv.hostPlatform.isLinux;
 
 		# build for the target platform
-		crossSelection = makeSelection {
-			overlays = lib.warn "OVERLAYS" [ # fetlock overlays
-				(self: super: {
+		selection = super.runix.makeSelection {
+			overlays = [ # fetlock overlays
+				(fetlockSelf: fetlockSuper: {
 					specToDrv = spec:
-						# Here we re-split deps into build / target. If it's a macro crate,
+						# Here we split deps into build / target. If it's a macro crate,
 						# of a build dep, pull it from nativeSelection so we can run it at build time
-						# This would happen magically if we used a full cross-env
-						if spec.procMacro or false then nativeSelection.specToDrv spec else
-							(super.specToDrv spec).override (base: {
-								buildDependencies = map nativeSelection.getDrv (spec.buildDepKeys or []);
+						# TODO buildRustCrate should handle this ...
+						let nativeDrv = key: vanillaPkgs.runix.selection.getDrv key; in
+						if spec.procMacro or false then nativeDrv spec.key else
+							(fetlockSuper.specToDrv spec).override (base: {
+								buildDependencies = map nativeDrv (spec.buildDepKeys or []);
 							});
 
-					pkgs = lib.warn "PKGS?" (super.pkgs // {
-						buildRustCrate = (
-							args: lib.warn "BRCrate! ${args.pname}" (super.pkgs.buildRustCrate.override {
-								# fake stdenv just for buildRustCrate. This causes it to pass the relevant --target flag everwhere
-								# stdenv = nativePkgs.stdenv // {
-								# 	hostPlatform = cross.pkgs.hostPlatform;
-								# };
-								rustc = cross.rust;
-								cargo = cross.rust;
-							} (args // {
-								extraRustcOpts = ["-C" "linker=${cross.pkgs.stdenv.cc}/bin/${cross.pkgs.stdenv.cc.targetPrefix}ld"] ++ (
-									if args.pname == "runix" then
-										# TODO not sure why the standard hooks don't catch this? Is it down to cross-platform quirks?
-										[ "-C" "link-args=-L${cross.pkgs.libiconv}/lib" ] ++ (
-											if cross.pkgs.stdenv.isDarwin then [
-												"-C" "link-args=-F${cross.pkgs.darwin.apple_sdk.frameworks.Security}/Library/Frameworks"
-												"-C" "link-args=-F${cross.pkgs.darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks"
-											] else []
-										)
-									else []
+					pkgs = fetlockSuper.pkgs // {
+						buildRustCrate = args: fetlockSuper.pkgs.buildRustCrate (args // {
+							preConfigure = preconfigureIconvHack;
+							extraRustcOpts =
+								(lib.optionals
+									(lib.elem args.pname [ "serde_derive" "thiserror-impl" "runix" ])
+									[ "-C" "link-args=-L${pkgsBuildBuild.libiconv}/lib" ]
+								) ++
+								(lib.optionals
+									(args.pname == "runix")
+									(
+										[ "-C" "linker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}ld" ]
+										++ lib.optionals isBuildingOnDarwinForLinux
+											[
+												# https://github.com/NixOS/nixpkgs/pull/187225/files
+												# libgcc_s.so
+												"-C" "link-args=-L${stdenv.cc.cc.lib}/${stdenv.hostPlatform.config}/lib"
+
+												# libgcc.a
+												"-C" "link-args=-L${stdenv.cc.cc}/lib/gcc/${stdenv.hostPlatform.config}/${stdenv.cc.cc.version}"
+											]
+									)
+								) ++
+								(lib.optionals
+									(args.pname == "runix" && super.runix.isDarwin)
+									# TODO why isn't it enough to add these to buildInputs?
+									[
+										"-C" "link-args=-F${darwin.apple_sdk.frameworks.Security}/Library/Frameworks"
+										"-C" "link-args=-F${darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks"
+									]
+								) ++
+								
+								# Because buildRustPackage isn't cross-aware, it embeds an .so filename instead of .dylib for
+								# proc-macro dependencies. Add a second --extern flag to override the first.
+								# Note that _just_ this isn't enough; see the above hack where we symlink .so -> .dylib
+								(lib.optionals
+									(isBuildingOnDarwinForLinux && args.pname == "openssl")
+									(let impl = vanillaPkgs.runix.selection.drvsByName.openssl-macros; in
+										[ "--extern" "openssl_macros=${impl.lib}/lib/libopenssl_macros-${impl.metadata}.dylib" ])
+								) ++
+								(lib.optionals
+									(isBuildingOnDarwinForLinux && args.pname == "serde")
+									(let impl = vanillaPkgs.runix.selection.drvsByName.serde_derive; in
+										[ "--extern" "serde_derive=${impl.lib}/lib/libserde_derive-${impl.metadata}.dylib" ])
+								) ++
+								(lib.optionals
+									(isBuildingOnDarwinForLinux && args.pname == "thiserror")
+									(let impl = vanillaPkgs.runix.selection.drvsByName.thiserror-impl; in
+										[ "--extern" "thiserror_impl=${impl.lib}/lib/libthiserror_impl-${impl.metadata}.dylib" ])
 								);
-							})
-							)
-						);
-					});
+						});
+					};
 				})
 			];
 
-			pkgOverrides = self: [
-				(self.addBuildInputs {
-					serde_derive = [ cross.pkgs.libiconv ] ++ codesignDeps;
-					runix = codesignDeps;
+			pkgOverrides = api: [
+				(api.addBuildInputs {
+					serde_derive = self.runix.codesignDeps;
+					runix = self.runix.codesignDeps;
 				})
-			] ++ commonPkgOverrides self;
-
+			] ++ super.runix.commonPkgOverrides api;
 		};
 	in {
-		# Note: these are focefully taken from pkgsBuildBuild (i.e. fully native), because fenix
-		# lets us add target platforms without needing to rely on pkgsCross
-		rust = cross.rust;
-		rustc = cross.rust;
-		cargo = cross.rust;
+		fenix-rust = self.fenix.combine [
+			super.fenix-rust
+			(builtins.getAttr nixPlatform self.fenix.targets).stable.rust-std
+		];
 
-		selection = lib.warn "SOME ONE" crossSelection.drvsByName;
-		nativeSelection = nativeSelection.drvsByName;
-		runix = crossSelection.drvsByName.runix;
+		runix = super.runix // {
+			inherit selection;
+			nativeSelection = vanillaPkgs.runix.selection;
+		};
+	};
+
+	commonOverlays = [
+		(import "${sources.fenix}/overlay.nix")
+		baseOverlay
+	];
+
+	vanillaPkgs = import <nixpkgs> {
+		overlays = commonOverlays;
+	};
+
+	crossPkgs = if platform == null then vanillaPkgs else import <nixpkgs> {
+		crossSystem.config = nixPlatform;
+		overlays = commonOverlays ++ [crossOverlay];
 	};
 in
 
-import <nixpkgs> {
-	overlays = [
-		overlay
-		(import "${sources.fenix}/overlay.nix")
-	];
-}
-
+crossPkgs
