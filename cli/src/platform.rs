@@ -14,11 +14,10 @@ pub enum OS {
 impl FromStr for OS {
 	type Err = anyhow::Error;
 
-	// We align with rust OS names, but to work with `uname` we also accept "Darwin" for macOS
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
-			"Linux" => Ok(Self::Linux),
-			"macOS" | "Darwin" => Ok(Self::macOS),
+			"Linux" /* uname -s */ | "linux" /* consts::OS */ => Ok(Self::Linux),
+			"macOS" /* rust name */ | "macos" /* consts::OS */ | "Darwin" /* uname -s */ => Ok(Self::macOS),
 			other => Err(anyhow!("Unknown OS: {}", other))
 		}
 	}
@@ -26,13 +25,7 @@ impl FromStr for OS {
 
 impl OS {
 	pub fn current() -> Result<Self> {
-		if cfg!(target_os = "macos") {
-			Ok(Self::macOS)
-		} else if cfg!(target_arch = "linux") {
-			Ok(Self::Linux)
-		} else {
-			Err(anyhow!("Unknown OS: {}", std::env::consts::OS))
-		}
+		Self::from_str(std::env::consts::OS)
 	}
 }
 

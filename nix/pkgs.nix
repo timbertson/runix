@@ -3,7 +3,7 @@ let
 	nixPlatform = builtins.getAttr platform {
 		"Darwin-aarch64" = "aarch64-apple-darwin";
 		"Darwin-x86_64" = "x86_64-apple-darwin";
-		"Linux-x86_64" = "x86_64-unknown-linux-gnu";
+		"Linux-x86_64" = "x86_64-unknown-linux-musl";
 	};
 	sources = import ./sources.nix {};
 
@@ -116,23 +116,8 @@ EOF
 							preConfigure = preconfigureIconvHack;
 							extraRustcOpts =
 								(lib.optionals
-									(lib.elem args.pname [ "serde_derive" "thiserror-impl" "runix" ])
-									[ "-C" "link-args=-L${pkgsBuildBuild.libiconv}/lib" ]
-								) ++
-								(lib.optionals
 									(args.pname == "runix")
-									(
-										[ "-C" "linker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}ld" ]
-										++ lib.optionals isBuildingOnDarwinForLinux
-											[
-												# https://github.com/NixOS/nixpkgs/pull/187225/files
-												# libgcc_s.so
-												"-C" "link-args=-L${stdenv.cc.cc.lib}/${stdenv.hostPlatform.config}/lib"
-
-												# libgcc.a
-												"-C" "link-args=-L${stdenv.cc.cc}/lib/gcc/${stdenv.hostPlatform.config}/${stdenv.cc.cc.version}"
-											]
-									)
+									[ "-C" "linker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}ld" ]
 								) ++
 								(lib.optionals
 									(args.pname == "runix" && super.runix.isDarwin)
