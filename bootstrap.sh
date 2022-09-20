@@ -21,7 +21,7 @@ _() {
 
 	cleanup
 
-	echo >&2 "[runix-bootstrap] extracting ..."
+	echo >&2 "[runix-bootstrap] extracting to ${TMP_DEST} ..."
 	mkdir -p "$TMP_DEST"
 	tar xzf "$TMP_TAR" -C "$TMP_DEST"
 	rm -f "$TMP_TAR"

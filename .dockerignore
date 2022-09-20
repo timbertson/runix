@@ -1,5 +1,5 @@
 /target
-/build/*
+/build
 !/build/*.sh
 !/build/*.gup
 !/build/Gupfile

@@ -166,6 +166,10 @@ impl Target {
 							.arg("-sfn").arg(format!("store/{}/bin/runix", store_identity))
 							.arg(self.output.join("runix"))
 						);
+						
+						// Some tar implementations choke trying to extract a file into a readonly
+						// dir, so don't do that!
+						run_ref(Command::new("chmod").arg("-R").arg("+w").arg(&store_path));
 					},
 
 					"bootstrap.drv" => {

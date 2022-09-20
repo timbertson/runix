@@ -1,6 +1,6 @@
 use anyhow::*;
 use serial_test::serial;
-use std::{process::Command, path::PathBuf, fs};
+use std::{process::Command, path::PathBuf, fs, env};
 use itertools::Itertools;
 
 fn run_exe(pname: &str, args: Vec<&str>) -> Result<String> {
@@ -88,25 +88,68 @@ fn test_in_temp_runix<F: FnOnce(&str) -> Result<()>>(f: F) -> Result<()> {
 	result
 }
 
+fn current_platform() -> Result<String> {
+	let mut platform_cmd = Command::new("uname");
+	platform_cmd.arg("-m").arg("-s");
+	Ok(String::from_utf8(platform_cmd.output()?.stdout)?.trim().replace(' ', "-"))
+}
+
 // expensive integration tests; run with --ignored
 #[test]
 #[serial]
 #[ignore]
 fn local_bootstrap() -> Result<()> {
+	let platform_build = format!("build/platforms/{}", current_platform()?);
+	run(Command::new("gup")
+		.arg("-u")
+		.arg("../build/platforms/current/bootstrap")
+	)?;
+
 	test_in_temp_runix(|root| {
-		let mut platform_cmd = Command::new("uname");
-		platform_cmd.arg("-m").arg("-s");
-		let platform = String::from_utf8(platform_cmd.output()?.stdout)?.trim().replace(' ', "-");
-		let platform_build = format!("build/platforms/{}", platform);
-		run(Command::new("gup")
-			.arg("-u")
-			.arg("../build/platforms/current/bootstrap")
-		)?;
 		run(Command::new("../bootstrap.sh")
 			.env("RUNIX_ROOT", root)
 			.env("LOCAL_BOOTSTRAP", format!("../{}", &platform_build))
 		)
 	})
+}
+
+#[test]
+#[serial]
+#[ignore]
+fn linux_bootstrap_in_docker() -> Result<()> {
+	// This checks linux on darwin. There's no way to check darwin on linux
+	let platform = current_platform()?;
+	if platform.starts_with("Linux") {
+		println!("Skipping test; already on Linux");
+		return Ok(())
+	}
+
+	let platform_build = "build/platforms/Linux-x86_64";
+	run(Command::new("gup")
+		.arg("-u")
+		.arg(format!("../{}/bootstrap", &platform_build))
+	)?;
+	
+	let root_dir = env::current_dir()?.parent().unwrap().to_string_lossy().to_string();
+
+	run(Command::new("docker")
+		.arg("build")
+		.arg("--quiet")
+		.arg("--tag").arg("runix-linux-test")
+		.arg("--file").arg("Dockerfile.test")
+		.arg(".")
+		.current_dir(&root_dir)
+	)?;
+
+	run(Command::new("docker")
+		.arg("run")
+		.arg("--rm")
+		.arg("--volume").arg(format!("{}:/app", &root_dir))
+		.arg("runix-linux-test")
+		.arg("bash").arg("-euxc")
+		.arg("/app/bootstrap.sh && ~/bin/runix --help")
+		.env("LOCAL_BOOTSTRAP", format!("/app/{}", &platform_build))
+	)
 }
 
 #[test]
@@ -121,11 +164,3 @@ fn remote_bootstrap() -> Result<()> {
 		)
 	})
 }
-
-// TODO:
-// #[test]
-// #[serial]
-// #[ignore]
-// fn linux_bootstrap() -> Result<()> {
-// 	// TODO this checks linux on darwin. There's no way to check darwin on linux :/
-// }
