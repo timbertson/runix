@@ -18,12 +18,8 @@ mkShell {
 			in base.overrideAttrs (_: { src = sources.gup; })
 		)
 		git
-		] ++ (
+	] ++ (
 		lib.optionals stdenv.isDarwin (with darwin.apple_sdk; [
 			frameworks.Security
-		# 	frameworks.CoreServices
-		# 	frameworks.CoreFoundation
-		# 	frameworks.Foundation
-		# 	frameworks.AppKit
 		]));
 }

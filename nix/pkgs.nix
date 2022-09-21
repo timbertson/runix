@@ -41,6 +41,9 @@ let
 					src = "${root}/cli";
 					buildInputs = (super.buildInputs or []) ++ frameworkDeps ++ [ libiconv ];
 				};
+				webpki-roots = base: {
+					buildInputs = (super.buildInputs or []) ++ frameworkDeps ++ [ libiconv ];
+				};
 			})
 		] ++ lib.optionals (stdenv.buildPlatform.isDarwin && stdenv.hostPlatform.isLinux)
 		[
@@ -116,26 +119,13 @@ EOF
 							preConfigure = preconfigureIconvHack;
 							extraRustcOpts =
 								(lib.optionals
-									(args.pname == "runix")
+									(lib.elem args.pname [ "runix" "webpki-roots" ])
 									[ "-C" "linker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}ld" ]
-								) ++
-								(lib.optionals
-									(args.pname == "runix" && super.runix.isDarwin)
-									# TODO why isn't it enough to add these to buildInputs?
-									[
-										"-C" "link-args=-F${darwin.apple_sdk.frameworks.Security}/Library/Frameworks"
-										"-C" "link-args=-F${darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks"
-									]
 								) ++
 								
 								# Because buildRustPackage isn't cross-aware, it embeds an .so filename instead of .dylib for
 								# proc-macro dependencies. Add a second --extern flag to override the first.
 								# Note that _just_ this isn't enough; see the above hack where we symlink .so -> .dylib
-								(lib.optionals
-									(isBuildingOnDarwinForLinux && args.pname == "openssl")
-									(let impl = vanillaPkgs.runix.selection.drvsByName.openssl-macros; in
-										[ "--extern" "openssl_macros=${impl.lib}/lib/libopenssl_macros-${impl.metadata}.dylib" ])
-								) ++
 								(lib.optionals
 									(isBuildingOnDarwinForLinux && args.pname == "serde")
 									(let impl = vanillaPkgs.runix.selection.drvsByName.serde_derive; in
