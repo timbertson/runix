@@ -145,10 +145,11 @@ fn linux_bootstrap_in_docker() -> Result<()> {
 		.arg("run")
 		.arg("--rm")
 		.arg("--volume").arg(format!("{}:/app", &root_dir))
+		.arg("--env").arg(format!("LOCAL_BOOTSTRAP=/app/{}", &platform_build))
+		.arg("--env").arg("PATH=/usr/bin:/usr/local/bin:/home/app/bin")
 		.arg("runix-linux-test")
 		.arg("bash").arg("-euxc")
 		.arg("/app/bootstrap.sh && ~/bin/runix --help")
-		.env("LOCAL_BOOTSTRAP", format!("/app/{}", &platform_build))
 	)
 }
 

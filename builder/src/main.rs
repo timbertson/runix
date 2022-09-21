@@ -159,6 +159,7 @@ impl Target {
 						run_ref(Command::new(RUNIX_BIN).arg("--generate-bootstrap").arg(&store_path));
 						run_ref(Command::new(RUNIX_BIN)
 							.arg("--save").arg(self.output.join("wrapper"))
+							.arg("--platform").arg(&self.buildable.platform)
 							.arg("--with-cache").arg("https://runix.cachix.org")
 							.arg("--entrypoint").arg(store_identity).arg("bin/runix")
 						);
