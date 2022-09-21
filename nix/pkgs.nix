@@ -122,6 +122,14 @@ EOF
 									(lib.elem args.pname [ "runix" "webpki-roots" ])
 									[ "-C" "linker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}ld" ]
 								) ++
+								(lib.optionals
+									(lib.elem args.pname [ "runix" "webpki-roots" ] && super.runix.isDarwin)
+									# TODO why isn't it enough to add these to buildInputs?
+									[
+										"-C" "link-args=-F${darwin.apple_sdk.frameworks.Security}/Library/Frameworks"
+										"-C" "link-args=-F${darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks"
+									]
+								) ++
 								
 								# Because buildRustPackage isn't cross-aware, it embeds an .so filename instead of .dylib for
 								# proc-macro dependencies. Add a second --extern flag to override the first.

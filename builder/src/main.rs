@@ -52,7 +52,7 @@ pub fn all_platforms() -> Vec<&'static str> {
 	vec!(
 		"Linux-x86_64",
 		"Darwin-x86_64",
-		// "Darwin-aarch64", // TODO
+		"Darwin-aarch64",
 	)
 }
 
