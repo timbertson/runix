@@ -1,0 +1,7 @@
+from alpine
+run apk update
+run apk add bash curl
+run adduser -D app
+user app
+workdir /home/app
+run mkdir bin

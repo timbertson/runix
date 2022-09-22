@@ -15,17 +15,33 @@ let
 		fenix-rust = self.fenix.stable.withComponents [ "cargo" "rustc" ];
 		root = builtins.fetchGit { url = ../.; ref = "HEAD"; };
 		fetlock = (callPackage sources.fetlock {});
+		removeReferencesTo = super.pkgsBuildBuild.removeReferencesTo;
+		replaceReferences = old: new: paths: ''
+			if [ "$(echo "${old}" | wc -c)" = "$(echo "${new}" | wc -c)" ]; then
+				echo "Replacing references to ${old} with ${new}"
+				sed -i -e 's|${old}|${new}|g' ${paths}
+			else
+				echo "ERROR: ${old} and ${new} paths differ in length"
+				exit 1
+			fi
+		'';
 
 		# extractors just contains exact binaries needed, to reduce
 		# closure size by avoiding e.g. bash dependency
-		extractors = stdenv.mkDerivation {
-			pname = "runix-extract";
-			version = "1";
-			buildCommand = ''
-				mkdir -p "$out/bin"
-				cp -a --dereference "${xz}/bin/xz" "$out/bin/unxz"
-			'';
-		};
+		extractors =
+			let
+			in stdenv.mkDerivation {
+				pname = "runix-extract";
+				version = "1";
+				buildCommand = ''
+					mkdir -p "$out/bin"
+					cp -a "${self.xz.bin}/bin/xz" "$out/bin/unxz"
+					chmod -R +x $out
+					${removeReferencesTo}/bin/remove-references-to \
+						-t ${self.xz.bin} \
+						$out/bin/*
+				'';
+			};
 		
 		makeSelection = fetlock.cargo.load (./lock + "/${if platform == null then "current" else platform}.nix");
 		
@@ -37,12 +53,12 @@ let
 		commonPkgOverrides = api: [
 			(api.overrideAttrs {
 				runix = base: {
-					RUNIX_EXTRACTORS_BIN="${extractors}/bin";
+					RUNIX_EXTRACTORS_BIN="${pkgsBuildHost.runix-extractors}/bin";
 					src = "${root}/cli";
-					buildInputs = (super.buildInputs or []) ++ frameworkDeps ++ [ libiconv ];
+					buildInputs = (super.buildInputs or []) ++ frameworkDeps ++ [ self.libiconv ];
 				};
 				webpki-roots = base: {
-					buildInputs = (super.buildInputs or []) ++ frameworkDeps ++ [ libiconv ];
+					buildInputs = (super.buildInputs or []) ++ frameworkDeps ++ [ self.libiconv ];
 				};
 			})
 		] ++ lib.optionals (stdenv.buildPlatform.isDarwin && stdenv.hostPlatform.isLinux)
@@ -67,12 +83,30 @@ let
 		];
 		
 		selection = makeSelection { pkgOverrides = commonPkgOverrides; };
+
+
+		recursivelyStripCF = drv:
+			if self.runix.isDarwin then (
+				let
+					real = pkgsBuildHost.darwin.CF;
+					empty = pkgsBuildHost.stdenv.mkDerivation {
+						inherit (real) pname name version outputs;
+						buildCommand = "mkdir $out";
+					};
+				in pkgsBuildBuild.replaceDependency {
+					inherit drv;
+					oldDependency = lib.warn "REAL CF: ${real}" real;
+					newDependency = lib.warn "EMPTY: ${empty}" empty;
+				}
+			) else drv;
 	in {
 		inherit fenix-rust;
 		rustc = self.fenix-rust;
 		cargo = self.fenix-rust;
+		runix-extractors = extractors;
 		runix = {
-			inherit makeSelection selection root commonPkgOverrides isDarwin extractors;
+			inherit makeSelection selection root commonPkgOverrides isDarwin;
+			cli = recursivelyStripCF self.runix.selection.drvsByName.runix;
 
 			codesignDeps = lib.optionals isDarwin [
 				# https://github.com/NixOS/nixpkgs/issues/148189
