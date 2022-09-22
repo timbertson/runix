@@ -88,15 +88,24 @@ let
 		recursivelyStripCF = drv:
 			if self.runix.isDarwin then (
 				let
-					real = pkgsBuildHost.darwin.CF;
-					empty = pkgsBuildHost.stdenv.mkDerivation {
-						inherit (real) pname name version outputs;
+					realCF = pkgsBuildHost.darwin.CF;
+					emptyCF = pkgsBuildHost.stdenv.mkDerivation {
+						inherit (realCF) pname name version outputs;
+						buildCommand = "mkdir $out";
+					};
+					realLibsystem = pkgsBuildHost.darwin.Libsystem;
+					emptyLibsystem = pkgsBuildHost.stdenv.mkDerivation {
+						inherit (realLibsystem) pname name version outputs;
 						buildCommand = "mkdir $out";
 					};
 				in pkgsBuildBuild.replaceDependency {
-					inherit drv;
-					oldDependency = lib.warn "REAL CF: ${real}" real;
-					newDependency = lib.warn "EMPTY: ${empty}" empty;
+					oldDependency = realLibsystem;
+					newDependency = emptyLibsystem;
+					drv = pkgsBuildBuild.replaceDependency {
+						inherit drv;
+						oldDependency = lib.warn "REAL CF: ${realCF}" realCF;
+						newDependency = lib.warn "EMPTY: ${emptyCF}" emptyCF;
+					};
 				}
 			) else drv;
 	in {
