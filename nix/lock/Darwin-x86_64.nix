@@ -1216,6 +1216,7 @@ in
         ("itertools-0.10.3")
         ("serde-1.0.144")
         ("serde_json-1.0.85")
+        ("serial_test-0.9.0")
       ];
       crateBin = [
         ({

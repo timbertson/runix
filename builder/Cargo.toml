@@ -9,5 +9,6 @@ serde = { version = "1.0", features = ["derive"] }
 anyhow = "1"
 itertools = "0.10"
 
-[dev-dependencies]
+# This should be a dev dependency, but that needs
+# fetlock support
 serial_test = "0.9.0"
