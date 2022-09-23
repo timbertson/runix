@@ -29,22 +29,22 @@
         "homepage": null,
         "owner": "timbertson",
         "repo": "gup",
-        "rev": "version-0.8.2",
-        "sha256": "0kacr541xbzprps5g4zx5n8fa65qapnl7gxszp1i52mjqv382g2r",
+        "rev": "version-0.8.3",
+        "sha256": "0yprgqwrjq8kvcgkwy80h5497f4b6zgl1pa8nh8zcjv2xhnnn0gs",
         "type": "tarball",
-        "url": "https://github.com/timbertson/gup/archive/version-0.8.2.tar.gz",
+        "url": "https://github.com/timbertson/gup/archive/version-0.8.3.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
-        "branch": "release-21.05",
+        "branch": "release-22.05",
         "description": "Nix Packages collection",
         "homepage": "",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "5f244caea76105b63d826911b2a1563d33ff1cdc",
-        "sha256": "1xlgynfw9svy7nvh9nkxsxdzncv9hg99gbvbwv3gmrhmzc3sar75",
+        "rev": "e9bd3d0616382fdf7a3b4d1416935c5dbdf366f8",
+        "sha256": "05gw1xfzm2pi2pqak0g3dj8cmqz8i9aiwk3gy1bil0r3if1pgq1a",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/5f244caea76105b63d826911b2a1563d33ff1cdc.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/e9bd3d0616382fdf7a3b4d1416935c5dbdf366f8.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

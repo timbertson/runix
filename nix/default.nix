@@ -1,2 +1,2 @@
 { platform ? null }:
-(import ./pkgs.nix { inherit platform; }).runix.cli
+(import ./runix.nix { inherit platform; }).runix.cli

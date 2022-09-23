@@ -1,6 +1,10 @@
 let
 	sources = import ./sources.nix {};
-	pkgs = import sources.nixpkgs {};
+	pkgs = import sources.nixpkgs {
+		overlays = [
+			(import "${sources.fenix}/overlay.nix")
+		];
+	};
 	commonInputs = with pkgs; [
 		cachix
 		# gup # TODO: use upstream when v0.8.2 is released
@@ -9,12 +13,13 @@ let
 		)
 	];
 
+	fenix-toolchain = pkgs.fenix.stable.withComponents [ "cargo" "rustc" ];
+
 	# in development, we have tools available to build outside nix
 	dev = pkgs.mkShell {
 		# RUST_SRC_PATH = "${pkts.rustPlatform.rustLibSrc}";
 		buildInputs = commonInputs ++ (with pkgs; [
-			cargo
-			rustc
+			fenix-toolchain
 			rust-analyzer # IDE
 			libiconv # native libs
 			curl
@@ -28,7 +33,7 @@ let
 	
 	# in CI, we build the nix expression and then drop into a shell with extra
 	# utilities for running tests
-	runix = (import ./pkgs.nix {}).runix;
+	runix = (import ./runix.nix {}).runix;
 
 	ci = pkgs.mkShell {
 		# don't try to rebuild ./build/builder with cargo

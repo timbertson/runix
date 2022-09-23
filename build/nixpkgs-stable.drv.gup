@@ -1,5 +1,5 @@
 #!bash -eu
-gup -u ../nix/{nixpkgs.nix,sources.json}
-path="$(nix-instantiate --eval ../nix/nixpkgs.nix -A outPath | tr -d '"')"
+gup -u ../nix/{pkgs.nix,sources.json}
+path="$(nix-instantiate --eval ../nix/pkgs.nix -A outPath | tr -d '"')"
 ln -sfn "$path" "$1"
 echo "$path" | gup --contents
