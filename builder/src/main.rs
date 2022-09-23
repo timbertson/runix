@@ -88,7 +88,7 @@ impl Target {
 						let wrapper_scripts = all_platforms().into_iter().map(|platform| {
 							self.platform_dependency(platform, "bootstrap.dir").path() + "/wrapper"
 						});
-						run_ref(Command::new(RUNIX_BIN)
+						run_ref(Command::new(runix_exe())
 							.arg("--merge-into").arg(&self.output)
 							.args(wrapper_scripts)
 						);
@@ -156,8 +156,8 @@ impl Target {
 						}
 
 						let store_identity = drop_store_prefix(&drv);
-						run_ref(Command::new(RUNIX_BIN).arg("--generate-bootstrap").arg(&store_path));
-						run_ref(Command::new(RUNIX_BIN)
+						run_ref(Command::new(runix_exe()).arg("--generate-bootstrap").arg(&store_path));
+						run_ref(Command::new(runix_exe())
 							.arg("--save").arg(self.output.join("wrapper"))
 							.arg("--platform").arg(&self.buildable.platform)
 							.arg("--with-cache").arg("https://runix.cachix.org")

@@ -3,16 +3,16 @@ use serial_test::serial;
 use std::{process::Command, path::PathBuf, fs, env};
 use itertools::Itertools;
 
-// set in CI so we can use the nix-built runix
-const RUNIX_EXE : Option<&'static str> = option_env!("RUNIX_EXE");
-
 fn run_exe(pname: &str, args: Vec<&str>) -> Result<String> {
+	let runix_exe = "./build/runix";
+	assert!(Command::new("gup").arg("-u").arg(runix_exe).spawn()?.wait()?.success());
+
 	let mut path = PathBuf::from("../build/store-paths");
 	path.push(format!("{}.drv", pname));
 	assert!(Command::new("gup").arg("-u").arg(&path).spawn()?.wait()?.success());
 	let store_path = fs::read_to_string(path)?;
 
-	let mut cmd = Command::new(RUNIX_EXE.unwrap_or("../target/debug/runix"));
+	let mut cmd = Command::new(runix_exe);
 	cmd.arg("--require").arg(store_path.trim()).args(args);
 	cmd_output(cmd)
 }

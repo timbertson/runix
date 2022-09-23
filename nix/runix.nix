@@ -16,15 +16,6 @@ let
 		root = builtins.fetchGit { url = ../.; ref = "HEAD"; };
 		fetlock = (callPackage sources.fetlock {});
 		removeReferencesTo = super.pkgsBuildBuild.removeReferencesTo;
-		replaceReferences = old: new: paths: ''
-			if [ "$(echo "${old}" | wc -c)" = "$(echo "${new}" | wc -c)" ]; then
-				echo "Replacing references to ${old} with ${new}"
-				sed -i -e 's|${old}|${new}|g' ${paths}
-			else
-				echo "ERROR: ${old} and ${new} paths differ in length"
-				exit 1
-			fi
-		'';
 
 		# extractors just contains exact binaries needed, to reduce
 		# closure size by avoiding e.g. bash dependency
@@ -96,7 +87,6 @@ let
 				(fetlockSelf: fetlockSuper: {
 					pkgs = fetlockSuper.pkgs // {
 						buildRustCrate = args: fetlockSuper.pkgs.buildRustCrate (args // {
-							# buildTests = (lib.elem args.pname [ "runix-build" ]);
 							extraRustcOpts =
 								(lib.optionals
 									(lib.elem args.pname [ "webpki-roots" ] && self.runix.isDarwin)

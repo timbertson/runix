@@ -22,19 +22,24 @@ jobs:
         name: runix
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
-    - name: "Build"
-      run: nix-build
+    - run: nix-build
+    - run: nix-build --argstr platform Darwin-aarch64
+    # - run: nix-build --argstr platform Linux-x86_64
+
+      # TODO make this `all` platforms when Linux builds in CI
+    - name: "Create bootstrap artifacts"
+      run: |
+        nix-shell --attr ci nix/shell.nix --run '
+          set -eux
+          gup -u build/platforms/{Darwin-x86_64,Darwin-aarch64}/bootstrap.dir
+          set +x
+        '
+    - name: "Log platform sizes"
+      run: |
+        du -hs build/platforms/*/bootstrap.dir/store | while read line; do
+          echo "::notice::$line"
+        done
 
     - name: "Run tests"
       run: |
-        nix-shell --attr ci nix/shell.nix --run '
-          set -eux
-          "$RUNIX_TEST_EXE" --include-ignored
-        '
-
-    - name: "Build all platforms"
-      run: |
-        nix-shell --attr ci nix/shell.nix --run '
-          set -eux
-          gup -u build/platforms/all/bootstrap
-        '
+        nix-shell --attr ci nix/shell.nix --run 'gup test'

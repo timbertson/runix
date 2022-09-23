@@ -1,0 +1,13 @@
+#!bash -eu
+gup --always
+if [ -n "${RUNIX_TESTS:-}" ]; then
+	# inside CI / nix-shell; precompiled tests
+	cd ./builder
+	for test_exe in $(find "$RUNIX_TESTS" -type f -executable | sort); do
+		echo "$test_exe" --include-ignored
+		"$test_exe" --include-ignored
+	done
+else
+	cargo test -- --include-ignored
+fi
+

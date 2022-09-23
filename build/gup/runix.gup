@@ -1,0 +1,10 @@
+#!bash -eu
+gup --always
+# set in CI so we can use the nix-built runix
+if [ -z "${RUNIX_EXE:-}" ]; then
+	cargo build --package runix
+	RUNIX_EXE="../target/debug/runix"
+fi
+
+gup --contents "$RUNIX_EXE"
+ln -sfn "$RUNIX_EXE" "$1"

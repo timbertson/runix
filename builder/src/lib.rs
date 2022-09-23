@@ -16,7 +16,11 @@ macro_rules! log {
 	}
 }
 
-pub const RUNIX_BIN: &'static str = "../target/debug/runix";
+pub fn runix_exe() -> &'static str {
+	let path = "./runix";
+	run_ref(Command::new("gup").arg("-u").arg(path));
+	path
+}
 
 #[derive(Debug)]
 pub struct Buildable {
@@ -69,7 +73,7 @@ fn assert_successful(desc: CmdCensored, status: io::Result<std::process::ExitSta
 	match status.map(|st| st.success()) {
 		Ok(true) => (),
 		Ok(false) => panic!("Command failed: {:?}", &desc),
-		Err(err) => panic!("Spawn failed: {:?}", &err),
+		Err(err) => panic!("Spawn failed: {:?} -- ${:?}", &err, &desc),
 	}
 }
 

@@ -1,6 +1,7 @@
 #!bash -eux
 gup -u ./nixpkgs-stable.drv
 nixpkgs="$(readlink ./nixpkgs-stable.drv)"
+[ -n "$nixpkgs" ]
 pname="$(basename "$2" .drv)"
 out_path="$(nix-instantiate --eval "$nixpkgs" -A "$pname".outPath | tr -d '"' | sed -e 's@/nix/store/@@')"
 [ -n "$out_path" ]

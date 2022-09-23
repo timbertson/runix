@@ -1,11 +1,9 @@
 #!bash -eu
 gup --always
-if [ -n "${RUNIX_BUILDER_EXE:-}" ]; then
-	gup --contents "$RUNIX_BUILDER_EXE"
-else
-	gup -u ../builder/src/*.rs ../builder/Cargo.toml
+if [ -z "${RUNIX_BUILDER_EXE:-}" ]; then
 	cargo build --package runix-build
 	RUNIX_BUILDER_EXE="../target/debug/runix-build"
 fi
 
+gup --contents "$RUNIX_BUILDER_EXE"
 ln -sfn "$RUNIX_BUILDER_EXE" "$1"

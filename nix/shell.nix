@@ -36,9 +36,10 @@ let
 	runix = (import ./runix.nix {}).runix;
 
 	ci = pkgs.mkShell {
-		# don't try to rebuild ./build/builder with cargo
+		# build system will build with cargo; set these to override
+		RUNIX_EXE = "${runix.cli}/bin/runix";
 		RUNIX_BUILDER_EXE = "${runix.builder}/bin/runix-build";
-		RUNIX_TEST_EXE = "${runix.tests}/tests/runix-build";
+		RUNIX_TESTS = "${runix.tests}/tests";
 		buildInputs = commonInputs ++ [
 			runix.cli
 			runix.builder
