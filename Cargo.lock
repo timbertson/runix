@@ -647,7 +647,6 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serial_test",
  "walkdir",
 ]
 
@@ -655,8 +654,11 @@ dependencies = [
 name = "runix-build"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "itertools",
  "serde",
  "serde_json",
+ "serial_test",
 ]
 
 [[package]]

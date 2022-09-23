@@ -3,13 +3,16 @@ use serial_test::serial;
 use std::{process::Command, path::PathBuf, fs, env};
 use itertools::Itertools;
 
+// set in CI so we can use the nix-built runix
+const RUNIX_EXE : Option<&'static str> = option_env!("RUNIX_EXE");
+
 fn run_exe(pname: &str, args: Vec<&str>) -> Result<String> {
 	let mut path = PathBuf::from("../build/store-paths");
 	path.push(format!("{}.drv", pname));
 	assert!(Command::new("gup").arg("-u").arg(&path).spawn()?.wait()?.success());
 	let store_path = fs::read_to_string(path)?;
 
-	let mut cmd = Command::new("../target/debug/runix");
+	let mut cmd = Command::new(RUNIX_EXE.unwrap_or("../target/debug/runix"));
 	cmd.arg("--require").arg(store_path.trim()).args(args);
 	cmd_output(cmd)
 }
@@ -46,24 +49,25 @@ fn run_wrapper(pname: &str, args: Vec<&str>) -> Result<String> {
 	cmd_output(cmd)
 }
 
-fn assert_contains(needle: &'static str, data: String) -> Result<()> {
-	if data.contains(needle) {
+fn assert_contains<S: AsRef<str>>(needle: &'static str, data: S) -> Result<()> {
+	let data_ref = data.as_ref();
+	if data_ref.contains(needle) {
 		Ok(())
 	} else {
-		Err(anyhow!("Value doesn't contain '{}':\n\n{}", needle, data))
+		Err(anyhow!("Value doesn't contain '{}':\n\n{}", needle, data_ref))
 	}
 }
 
 #[test]
 fn gnupg() -> Result<()> {
 	let output = run_exe("gnupg", vec!("gpg", "--help"))?;
-	assert_contains("gpg (GnuPG) 2.3.6", output)
+	assert_contains("gpg (GnuPG)", output)
 }
 
 #[test]
 fn jq() -> Result<()> {
 	let output = run_wrapper("jq", vec!("--help"))?;
-	assert_contains("jq - commandline JSON processor [version 1.6]", output)
+	assert_contains("jq - commandline JSON processor", output)
 }
 
 fn cleanup_runix_root(tmp: &str) -> Result<()> {
@@ -94,7 +98,10 @@ fn current_platform() -> Result<String> {
 	Ok(String::from_utf8(platform_cmd.output()?.stdout)?.trim().replace(' ', "-"))
 }
 
+// ###################################################
 // expensive integration tests; run with --ignored
+// ###################################################
+
 #[test]
 #[serial]
 #[ignore]
@@ -113,8 +120,60 @@ fn local_bootstrap() -> Result<()> {
 	})
 }
 
+fn all_platforms() -> Vec<&'static str> {
+	vec!(
+		"Linux-x86_64",
+		"Darwin-x86_64",
+		"Darwin-aarch64",
+	)
+}
+
 #[test]
-#[serial]
+#[ignore]
+fn crossplatform_file_types() -> Result<()> {
+	let platforms = "../build/platforms";
+	run(Command::new("gup")
+		.arg("-u")
+		.arg(format!("{}/all/bootstrap.dir", &platforms))
+	)?;
+	for platform in all_platforms() {
+		let mut find_cmd = Command::new("find");
+		find_cmd.arg(format!("{}/{}/bootstrap.dir", platforms, platform))
+			.arg("-type").arg("f")
+			.arg("-executable")
+			.arg("-exec").arg("file").arg("{}").arg(";");
+		for full_line in cmd_output(find_cmd)?.lines() {
+			let line = full_line.rsplit(": ").next().unwrap();
+			if line.trim().is_empty() {
+				continue
+			}
+			if line.contains("ASCII text") {
+				continue
+			} else {
+				match platform.split_once('-').unwrap() {
+					(os, arch) => {
+						let exe_type = match os {
+							"Darwin" => "Mach-O",
+							"Linux" => "ELF",
+							_ => todo!(),
+						};
+						let arch_name = match arch {
+							"x86_64" => "x86-64",
+							"aarch64" => "arm64",
+							_ => todo!(),
+						};
+						println!("FILE OUTPUT: {}", line);
+						assert_contains(arch, line).or(assert_contains(arch_name, line))?;
+						assert_contains(exe_type, line)?;
+					}
+				}
+			}
+		}
+	}
+	Ok(())
+}
+
+#[test]
 #[ignore]
 fn linux_bootstrap_in_docker() -> Result<()> {
 	// This checks linux on darwin. There's no way to check darwin on linux
@@ -146,7 +205,7 @@ fn linux_bootstrap_in_docker() -> Result<()> {
 		.arg("--rm")
 		.arg("--volume").arg(format!("{}:/app", &root_dir))
 		.arg("--env").arg(format!("LOCAL_BOOTSTRAP=/app/{}", &platform_build))
-		.arg("--env").arg("PATH=/usr/bin:/usr/local/bin:/home/app/bin")
+		.arg("--env").arg("PATH=/bin:/usr/bin:/usr/local/bin:/home/app/bin")
 		.arg("runix-linux-test")
 		.arg("bash").arg("-euxc")
 		.arg("/app/bootstrap.sh && ~/bin/runix --help")

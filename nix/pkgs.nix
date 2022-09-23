@@ -29,16 +29,16 @@ let
 		# extractors just contains exact binaries needed, to reduce
 		# closure size by avoiding e.g. bash dependency
 		extractors =
-			let
-			in stdenv.mkDerivation {
+			let xz = self.xz; in
+			pkgsBuildBuild.stdenv.mkDerivation {
 				pname = "runix-extract";
 				version = "1";
 				buildCommand = ''
 					mkdir -p "$out/bin"
-					cp -a "${self.xz.bin}/bin/xz" "$out/bin/unxz"
+					cp -a "${xz.bin}/bin/xz" "$out/bin/unxz"
 					chmod -R +x $out
 					${removeReferencesTo}/bin/remove-references-to \
-						-t ${self.xz.bin} \
+						-t ${xz.bin} \
 						$out/bin/*
 				'';
 			};
@@ -53,49 +53,76 @@ let
 		commonPkgOverrides = api: [
 			(api.overrideAttrs {
 				runix = base: {
-					RUNIX_EXTRACTORS_BIN="${pkgsBuildHost.runix-extractors}/bin";
+					RUNIX_EXTRACTORS_BIN="${pkgsHostTarget.runix-extractors}/bin";
 					src = "${root}/cli";
-					buildInputs = (super.buildInputs or []) ++ frameworkDeps ++ [ self.libiconv ];
+					buildInputs = (super.buildInputs or []) ++ frameworkDeps;
+				};
+				runix-build = base: {
+					src = "${root}/builder";
 				};
 				webpki-roots = base: {
-					buildInputs = (super.buildInputs or []) ++ frameworkDeps ++ [ self.libiconv ];
+					buildInputs = (super.buildInputs or []) ++ frameworkDeps;
 				};
 			})
-		] ++ lib.optionals (stdenv.buildPlatform.isDarwin && stdenv.hostPlatform.isLinux)
-		[
-			(api.overrideAll (drv: drv.overrideAttrs (base:
-				if base.passthru.spec.procMacro or false then {
-					# buildRustCrate is not cross-aware, so it tries to specify a .so location when building on
-					# darwin and targeting linux. Hack it up so that it's search path finds a .so
-					# NOTE: this just stops it blowing up, we also add need to add the .dylib path (done later)
-					postFixup = ''
-						if [ -e "$lib/lib" ]; then
-							pushd $lib/lib
-								for lib in *.dylib; do
-									# ln -s "$lib" "$(basename "$lib" .dylib)".so
-									cp -a "$lib" "$(basename "$lib" .dylib)".so
-								done
-							popd
-						fi
-					'';
-				} else {}
-			)))
-		];
+			(api.overrideAll (drv: drv.overrideAttrs (base: {
+				buildInputs = (base.buildInputs or []) ++ [ self.libiconv ];
+			})))
+		] ++
+		lib.optionals (stdenv.buildPlatform.isDarwin && stdenv.hostPlatform.isLinux)
+			[
+				(api.overrideAll (drv: drv.overrideAttrs (base:
+					(if base.passthru.spec.procMacro or false then {
+						# buildRustCrate is not cross-aware, so it tries to specify a .so location when building on
+						# darwin and targeting linux. Hack it up so that it's search path finds a .so
+						# NOTE: this just stops it blowing up, we also add need to add the .dylib path (done later)
+						postFixup = ''
+							if [ -e "$lib/lib" ]; then
+								pushd $lib/lib
+									for lib in *.dylib; do
+										# ln -s "$lib" "$(basename "$lib" .dylib)".so
+										cp -a "$lib" "$(basename "$lib" .dylib)".so
+									done
+								popd
+							fi
+						'';
+					} else {})
+				)))
+			]
+		;
 		
-		selection = makeSelection { pkgOverrides = commonPkgOverrides; };
-
+		selection = makeSelection {
+			pkgOverrides = commonPkgOverrides;
+			overlays = [ # fetlock overlays
+				(fetlockSelf: fetlockSuper: {
+					pkgs = fetlockSuper.pkgs // {
+						buildRustCrate = args: fetlockSuper.pkgs.buildRustCrate (args // {
+							# buildTests = (lib.elem args.pname [ "runix-build" ]);
+							extraRustcOpts =
+								(lib.optionals
+									(lib.elem args.pname [ "webpki-roots" ] && self.runix.isDarwin)
+									# TODO why isn't it enough to add these to buildInputs?
+									[
+										"-C" "link-args=-F${darwin.apple_sdk.frameworks.Security}/Library/Frameworks"
+										"-C" "link-args=-F${darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks"
+									]
+								);
+						});
+					};
+				})
+			];
+		};
 
 		recursivelyStripCF = drv:
 			if self.runix.isDarwin then (
 				let
 					realCF = pkgsBuildHost.darwin.CF;
 					emptyCF = pkgsBuildHost.stdenv.mkDerivation {
-						inherit (realCF) pname name version outputs;
+						inherit (realCF) name outputs;
 						buildCommand = "mkdir $out";
 					};
 					realLibsystem = pkgsBuildHost.darwin.Libsystem;
 					emptyLibsystem = pkgsBuildHost.stdenv.mkDerivation {
-						inherit (realLibsystem) pname name version outputs;
+						inherit (realLibsystem) name outputs;
 						buildCommand = "mkdir $out";
 					};
 				in pkgsBuildBuild.replaceDependency {
@@ -116,6 +143,10 @@ let
 		runix = {
 			inherit makeSelection selection root commonPkgOverrides isDarwin;
 			cli = recursivelyStripCF self.runix.selection.drvsByName.runix;
+			builder = self.runix.selection.drvsByName.runix-build;
+			tests = self.runix.selection.drvsByName.runix-build.override (_: {
+				buildTests = true;
+			});
 
 			codesignDeps = lib.optionals isDarwin [
 				# https://github.com/NixOS/nixpkgs/issues/148189
@@ -216,11 +247,11 @@ EOF
 		baseOverlay
 	];
 
-	vanillaPkgs = import <nixpkgs> {
+	vanillaPkgs = import sources.nixpkgs {
 		overlays = commonOverlays;
 	};
 
-	crossPkgs = if platform == null then vanillaPkgs else import <nixpkgs> {
+	crossPkgs = if platform == null then vanillaPkgs else import sources.nixpkgs {
 		crossSystem.config = nixPlatform;
 		overlays = commonOverlays ++ [crossOverlay];
 	};

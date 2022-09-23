@@ -1214,6 +1214,8 @@ in
       pname = "runix-build";
       version = "0.1.0";
       depKeys = [
+        ("anyhow-1.0.62")
+        ("itertools-0.10.3")
         ("serde-1.0.144")
         ("serde_json-1.0.85")
       ];
