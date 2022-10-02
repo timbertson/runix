@@ -136,6 +136,14 @@ impl Dependency {
 		}
 	}
 
+	pub fn build_many(targets: Vec<Dependency>) {
+		let unbuilt: Vec<&Dependency> = targets.iter().filter(|t| !t.built).collect();
+		if !unbuilt.is_empty() {
+			run_ref(Command::new("gup").arg("-u").args(unbuilt.iter().map(|t| &t._path)));
+			// don't need to set `built` because they're being dropped anyway
+		}
+	}
+
 	pub fn read_link(mut self) -> String {
 		readlink_str(self.path())
 	}

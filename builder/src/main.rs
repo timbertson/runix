@@ -72,9 +72,7 @@ impl Target {
 
 					"release" => {
 						// release all platform assets
-						for platform in all_platforms() {
-							self.platform_dependency(platform, "release").build();
-						}
+						self.build_all("release");
 
 						// and also release the runscript:
 						let runscript_path = self.dependency("runscript").path();
@@ -82,9 +80,7 @@ impl Target {
 					},
 
 					"runscript" => {
-						for platform in all_platforms() {
-							self.platform_dependency(platform, "bootstrap").build();
-						}
+						self.build_all("bootstrap");
 						let wrapper_scripts = all_platforms().into_iter().map(|platform| {
 							self.platform_dependency(platform, "bootstrap.dir").path() + "/wrapper"
 						});
@@ -96,9 +92,7 @@ impl Target {
 
 					other => {
 						// try and build platforms/*/$TARGET
-						for platform in all_platforms() {
-							self.platform_dependency(platform, other).build()
-						}
+						self.build_all(other)
 					},
 				}
 			},
@@ -194,6 +188,14 @@ impl Target {
 			},
 		}
 	}
+
+	fn build_all(&self, target: &str) {
+		let targets: Vec<Dependency> = all_platforms().iter().map(|platform| {
+			self.platform_dependency(platform, target)
+		}).collect();
+		Dependency::build_many(targets);
+	}
+
 	
 	fn tarball_name(&self) -> String {
 		format!("runix-{}.tgz", &self.buildable.platform)
