@@ -194,6 +194,19 @@ EOF
 										"-C" "link-args=-F${darwin.apple_sdk.frameworks.CoreFoundation}/Library/Frameworks"
 									]
 								) ++
+								(lib.optionals
+									# These flags _are_ passed already, but somehow they come before the ring rlib argument.
+									# They need to come afterwards, so just pass them again :shrug:
+									(lib.elem args.pname [ "runix" ])
+									[
+										"-C" "link-args=-lring-core"
+										"-C" "link-args=-lring-test"
+										
+										# This one is to solve: undefined reference to `__stack_chk_fail'
+										"-C" "link-args=-L${stdenv.cc.libc}/lib"
+										"-C" "link-args=-lc"
+									]
+								) ++
 								
 								# Because buildRustPackage isn't cross-aware, it embeds an .so filename instead of .dylib for
 								# proc-macro dependencies. Add a second --extern flag to override the first.
