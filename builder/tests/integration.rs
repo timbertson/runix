@@ -4,7 +4,7 @@ use std::{process::Command, path::PathBuf, fs, env};
 use itertools::Itertools;
 
 fn run_exe(pname: &str, args: Vec<&str>) -> Result<String> {
-	let runix_exe = "./build/runix";
+	let runix_exe = "../build/runix";
 	assert!(Command::new("gup").arg("-u").arg(runix_exe).spawn()?.wait()?.success());
 
 	let mut path = PathBuf::from("../build/store-paths");
