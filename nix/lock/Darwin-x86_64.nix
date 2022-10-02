@@ -45,7 +45,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/anyhow/1.0.62/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("default")
@@ -209,7 +209,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/encoding_rs/0.8.31/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("alloc")
@@ -308,7 +308,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/futures-channel/0.3.24/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("alloc")
@@ -328,7 +328,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/futures-core/0.3.24/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("alloc")
@@ -396,7 +396,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/futures-task/0.3.24/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("alloc")
@@ -422,7 +422,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/futures-util/0.3.24/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("alloc")
@@ -531,7 +531,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/httparse/1.7.1/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2015";
       features = [
         ("default")
@@ -642,10 +642,10 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/indexmap/1.9.1/download";
       });
+      build = "build.rs";
       buildDepKeys = [
         ("autocfg-1.1.0")
       ];
-      buildSrc = "build.rs";
       edition = "2021";
       features = [
         ("std")
@@ -743,7 +743,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/libc/0.2.132/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2015";
       features = [
         ("default")
@@ -761,10 +761,10 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/lock_api/0.4.8/download";
       });
+      build = "build.rs";
       buildDepKeys = [
         ("autocfg-1.1.0")
       ];
-      buildSrc = "build.rs";
       edition = "2018";
     };
     "log-0.4.17" = {
@@ -778,7 +778,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/log/0.4.17/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2015";
       features = [
         ("std")
@@ -807,7 +807,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/memchr/2.5.0/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("default")
@@ -934,7 +934,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/parking_lot_core/0.9.3/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       crateRenames = {
         redox_syscall = [
           ({
@@ -996,10 +996,10 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/proc-macro-error/1.0.4/download";
       });
+      build = "build.rs";
       buildDepKeys = [
         ("version_check-0.9.4")
       ];
-      buildSrc = "build.rs";
       edition = "2018";
       features = [
         ("default")
@@ -1019,10 +1019,10 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/proc-macro-error-attr/1.0.4/download";
       });
+      build = "build.rs";
       buildDepKeys = [
         ("version_check-0.9.4")
       ];
-      buildSrc = "build.rs";
       edition = "2018";
       procMacro = true;
     };
@@ -1037,7 +1037,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/proc-macro2/1.0.43/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("default")
@@ -1055,7 +1055,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/quote/1.0.21/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("default")
@@ -1173,10 +1173,10 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/ring/0.16.20/download";
       });
+      build = "build.rs";
       buildDepKeys = [
         ("cc-1.0.73")
       ];
-      buildSrc = "build.rs";
       edition = "2018";
       features = [
         ("alloc")
@@ -1240,7 +1240,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/rustls/0.20.6/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("dangerous_configuration")
@@ -1324,7 +1324,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/serde/1.0.144/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2015";
       features = [
         ("default")
@@ -1346,7 +1346,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/serde_derive/1.0.144/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2015";
       features = [
         ("default")
@@ -1366,7 +1366,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/serde_json/1.0.85/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("default")
@@ -1441,10 +1441,10 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/slab/0.4.7/download";
       });
+      build = "build.rs";
       buildDepKeys = [
         ("autocfg-1.1.0")
       ];
-      buildSrc = "build.rs";
       edition = "2018";
       features = [
         ("default")
@@ -1504,7 +1504,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/syn/1.0.99/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("clone-impls")
@@ -1607,10 +1607,10 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/tokio/1.20.1/download";
       });
+      build = "build.rs";
       buildDepKeys = [
         ("autocfg-1.1.0")
       ];
-      buildSrc = "build.rs";
       edition = "2018";
       features = [
         ("bytes")
@@ -1874,7 +1874,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/wasm-bindgen/0.2.82/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
       features = [
         ("default")
@@ -1967,7 +1967,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/wasm-bindgen-shared/0.2.82/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
     };
     "web-sys-0.3.59" = {
@@ -2051,7 +2051,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/winapi/0.3.9/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2015";
       features = [
         ("consoleapi")
@@ -2087,7 +2087,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/winapi-i686-pc-windows-gnu/0.4.0/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2015";
     };
     "winapi-util-0.1.5" = {
@@ -2112,7 +2112,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/winapi-x86_64-pc-windows-gnu/0.4.0/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2015";
     };
     "windows-sys-0.36.1" = {
@@ -2153,7 +2153,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/windows_aarch64_msvc/0.36.1/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
     };
     "windows_i686_gnu-0.36.1" = {
@@ -2166,7 +2166,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/windows_i686_gnu/0.36.1/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
     };
     "windows_i686_msvc-0.36.1" = {
@@ -2179,7 +2179,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/windows_i686_msvc/0.36.1/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
     };
     "windows_x86_64_gnu-0.36.1" = {
@@ -2192,7 +2192,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/windows_x86_64_gnu/0.36.1/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
     };
     "windows_x86_64_msvc-0.36.1" = {
@@ -2205,7 +2205,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/windows_x86_64_msvc/0.36.1/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2018";
     };
     "winreg-0.10.1" = {
@@ -2219,7 +2219,7 @@ in
         name = "crate.tar.gz";
         url = "https://crates.io/api/v1/crates/winreg/0.10.1/download";
       });
-      buildSrc = "build.rs";
+      build = "build.rs";
       edition = "2015";
     };
   };

@@ -24,14 +24,13 @@ jobs:
 
     - run: nix-build
     - run: nix-build --argstr platform Darwin-aarch64
-    # - run: nix-build --argstr platform Linux-x86_64
+    - run: nix-build --argstr platform Linux-x86_64
 
-      # TODO make this `all` platforms when Linux builds in CI
     - name: "Create bootstrap artifacts"
       run: |
         nix-shell --attr ci nix/shell.nix --run '
           set -eux
-          gup -u build/platforms/{Darwin-x86_64,Darwin-aarch64}/bootstrap.dir
+          gup -u build/platforms/all/bootstrap.dir
           set +x
         '
     - name: "Log platform sizes"

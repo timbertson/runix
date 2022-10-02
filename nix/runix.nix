@@ -120,7 +120,7 @@ let
 					newDependency = emptyLibsystem;
 					drv = pkgsBuildBuild.replaceDependency {
 						inherit drv;
-						oldDependency = lib.warn "REAL CF: ${realCF}" realCF;
+						oldDependency = lib.warn "REAL CF: ${realCF}" (builtins.unsafeDiscardStringContext realCF);
 						newDependency = lib.warn "EMPTY: ${emptyCF}" emptyCF;
 					};
 				}
@@ -184,7 +184,7 @@ EOF
 							extraRustcOpts =
 								(lib.optionals
 									(lib.elem args.pname [ "runix" "webpki-roots" ])
-									[ "-C" "linker=${stdenv.cc}/bin/${stdenv.cc.targetPrefix}ld" ]
+									[ "-C" "linker=${self.stdenv.cc}/bin/${self.stdenv.cc.targetPrefix}ld" ]
 								) ++
 								(lib.optionals
 									(lib.elem args.pname [ "runix" "webpki-roots" ] && super.runix.isDarwin)
