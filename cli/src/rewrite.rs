@@ -3,7 +3,7 @@ use log::*;
 use memmap2::MmapMut;
 use std::{path::Path, fs};
 use walkdir::WalkDir;
-use crate::{paths::{RewritePaths, self}, cache::StoreIdentity};
+use crate::{paths::{RewritePaths, self}, store::StoreIdentity};
 
 fn windows_mut_each<T>(v: &mut [T], n: usize, mut f: impl FnMut(&mut [T])) {
 	let mut start = 0;

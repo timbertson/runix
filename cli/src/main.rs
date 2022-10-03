@@ -1,6 +1,7 @@
 mod paths;
 mod rewrite;
 mod cache;
+mod store;
 mod platform;
 mod runner;
 mod serde_util;
@@ -15,7 +16,7 @@ use anyhow::*;
 use log::*;
 use paths::RuntimePaths;
 
-use crate::cache::StoreIdentity;
+use crate::store::StoreIdentity;
 use crate::paths::RewritePaths;
 use crate::platform::Platform;
 use crate::runner::{RunScript, PlatformExec, Entrypoint, mandatory_arg, mandatory_next_arg};
@@ -198,7 +199,7 @@ OPTIONS:
 				return Ok(());
 			} else if argstr == "--require" {
 				args.next();
-				let entry = cache::StoreIdentity::from(mandatory_next_arg("--require value", &mut args)?);
+				let entry = StoreIdentity::from(mandatory_next_arg("--require value", &mut args)?);
 				platform_exec.requirements.push(entry);
 			} else if argstr == "--with-cache" {
 				args.next();
@@ -212,7 +213,7 @@ OPTIONS:
 				platform = Platform::from_str(&mandatory_next_arg("--platform value", &mut args)?)?;
 			} else if argstr == "--entrypoint" {
 				args.next();
-				let derivation = cache::StoreIdentity::from(mandatory_next_arg("--entrypoint derivation", &mut args)?);
+				let derivation = StoreIdentity::from(mandatory_next_arg("--entrypoint derivation", &mut args)?);
 				let path = mandatory_next_arg("--entrypoint path", &mut args)?;
 				entrypoint = Some(Entrypoint { derivation, path });
 			} else if argstr.starts_with("--") {

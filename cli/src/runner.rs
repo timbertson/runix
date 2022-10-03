@@ -1,4 +1,5 @@
-use crate::cache::{StoreIdentity, self, Server};
+use crate::store::StoreIdentity;
+use crate::cache::{self, Server};
 use crate::paths::{RuntimePaths, self};
 use crate::platform::Platform;
 

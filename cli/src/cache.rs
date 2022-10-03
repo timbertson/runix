@@ -4,10 +4,11 @@ use anyhow::*;
 use log::*;
 use reqwest::StatusCode;
 use reqwest::blocking::Response;
-use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf, str::FromStr, fmt::Display};
+use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf, str::FromStr};
 
-use crate::paths::{RuntimePaths, self};
+use crate::paths::RuntimePaths;
 use crate::rewrite;
+use crate::store::{self, StoreIdentity};
 use crate::serde_from_string;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -51,62 +52,6 @@ impl ToString for Server {
 	}
 }
 
-pub struct StoreIdentityNameDisplay<'a>(&'a StoreIdentity);
-impl<'a> Display for StoreIdentityNameDisplay<'a> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.0.pair().1.fmt(f)
-	}
-}
-
-// The directory name within /nix/store, including both the hash and the name
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct StoreIdentity {
-	pub directory: String,
-}
-
-serde_from_string!(StoreIdentity);
-
-impl StoreIdentity {
-	pub fn hash(&self) -> &str {
-		self.pair().0
-	}
-
-	fn pair(&self) -> (&str, &str) {
-		self.directory.split_once('-')
-			.unwrap_or_else(|| panic!("Invalid store identity: {}", &self.directory))
-	}
-
-	fn display_name(&self) -> StoreIdentityNameDisplay<'_> {
-		StoreIdentityNameDisplay(&self)
-	}
-}
-
-impl From<String> for StoreIdentity {
-	fn from(directory: String) -> Self {
-		Self { directory }
-	}
-}
-
-impl From<&str> for StoreIdentity {
-	fn from(directory: &str) -> Self {
-		Self::from(directory.to_owned())
-	}
-}
-
-impl FromStr for StoreIdentity {
-	type Err = Error;
-
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		Ok(Self::from(s))
-	}
-}
-
-impl Display for StoreIdentity {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.directory.fmt(f)
-	}
-}
-
 #[derive(Copy, Clone, Debug)]
 pub enum Compression {
 	XZ,
@@ -136,7 +81,7 @@ pub struct NarInfo<'a> {
 	Sig: cache.nixos.org-1:GrGV/Ls10TzoOaCnrcAqmPbKXFLLSBDeGNh5EQGKyuGA4K1wv1LcRVb6/sU+NAPK8lDiam8XcdJzUngmdhfTBQ==
 	*/
 	url: String,
-	identity: &'a StoreIdentity,
+	pub identity: &'a StoreIdentity,
 	server: &'a Server,
 	compression: Compression,
 	pub references: Vec<StoreIdentity>,
@@ -222,15 +167,16 @@ impl Client {
 				}
 				self.download_and_extract(&narinfo)
 			} else {
-				Ok(())
+				store::touch_meta(&self.paths, entry)
 			}
 		}
 	}
 
 	fn fetch_narinfo_if_missing<'a>(&'a self, entry: &'a StoreIdentity) -> Result<Option<NarInfo<'a>>> {
 		let dest_path = self.paths.store_path.join(&entry.directory);
+		let meta_path = self.paths.meta_path.join(&entry.directory);
 		// TODO: locking for concurrent processes
-		if dest_path.exists() {
+		if meta_path.exists() && dest_path.exists() {
 			debug!("Cache path already exists: {:?}", dest_path);
 			return Ok(None);
 		}
@@ -293,12 +239,11 @@ impl Client {
 	}
 
 	fn download_and_extract(&self, nar_info: &NarInfo<'_>) -> Result<()> {
-		let extract_dest = self.paths.extract_path.join(&nar_info.identity.directory);
-		fs::create_dir_all(&self.paths.extract_path)?;
 		fs::create_dir_all(&self.paths.store_path)?;
-		if extract_dest.exists() {
+		let dest = self.paths.store_path.join(&nar_info.identity.directory);
+		if dest.exists() {
 			// remove previous attempt
-			crate::paths::util::rm_recursive(&extract_dest)?;
+			crate::paths::util::rm_recursive(&dest)?;
 		}
 
 		let url = nar_info.nar_url();
@@ -307,20 +252,13 @@ impl Client {
 		response.error_for_status_ref()?;
 		debug!("fetch response {:?}", &url);
 		
-		Self::extract(response, nar_info.compression, &extract_dest)?;
+		Self::extract(response, nar_info.compression, &dest)?;
 
 		// rewrite rpaths etc.
-		// TODO: capture a rewrite_version, so we can redo old paths if rewrite logic changes
-		rewrite::rewrite_all_recursively(&extract_dest, &self.paths.rewrite, &nar_info.references)?;
-
-		let dest = self.paths.store_path.join(&nar_info.identity.directory);
-
-		// TODO this is a bit silly, we made the whole store path unwriteable but we still
-		// need to move the root
-		paths::util::ensure_writeable(&extract_dest)?;
-		fs::rename(&extract_dest, &dest)
-			.with_context(|| format!("moving {:?} -> {:?}", &extract_dest, &dest))?;
-		paths::util::ensure_unwriteable(&dest)?;
+		rewrite::rewrite_all_recursively(&dest, &self.paths.rewrite, &nar_info.references)?;
+		
+		// create the meta file, which signifies the validity of the store path
+		store::write_meta(&self.paths, nar_info)?;
 
 		info!("Fetched {}", nar_info.identity.display_name());
 		Ok(())

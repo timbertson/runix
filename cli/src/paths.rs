@@ -1,7 +1,7 @@
 use anyhow::*;
 use std::{env, path::PathBuf};
 
-use crate::cache::StoreIdentity;
+use crate::store::StoreIdentity;
 
 // NOTE: these paths must be the same length
 const NIX_STORE: &'static str = "/nix/store";
@@ -37,7 +37,7 @@ pub struct RuntimePaths {
 	pub rewrite: RewritePaths,
 	pub runix_root: String,
 	pub store_path: PathBuf,
-	pub extract_path: PathBuf,
+	pub meta_path: PathBuf,
 }
 
 impl RuntimePaths {
@@ -63,12 +63,12 @@ impl RuntimePaths {
 
 		let rewrite = RewritePaths::default();
 		let store_path = PathBuf::from(format!("{}{}", runix_root, rewrite.src));
-		let extract_path = store_path.parent().unwrap().join("tmp");
+		let meta_path = store_path.parent().unwrap().join("info");
 		Ok(Self {
 			rewrite,
 			runix_root,
 			store_path,
-			extract_path,
+			meta_path,
 		})
 	}
 }

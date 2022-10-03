@@ -240,6 +240,28 @@ in
         ("termcolor")
       ];
     };
+    "filetime-0.2.17" = {
+      pname = "filetime";
+      version = "0.2.17";
+      depKeys = [
+        ("cfg-if-1.0.0")
+        ("libc-0.2.132")
+      ];
+      src = (pkgs.fetchurl {
+        hash = "sha256-6Up7uqWTVLwg3XW2fyPieXtEkOnWkoID+xBceeRIyGw=";
+        name = "crate.tar.gz";
+        url = "https://crates.io/api/v1/crates/filetime/0.2.17/download";
+      });
+      crateRenames = {
+        redox_syscall = [
+          ({
+            rename = "syscall";
+            version = "0.2.16";
+          })
+        ];
+      };
+      edition = "2018";
+    };
     "fnv-1.0.7" = {
       pname = "fnv";
       version = "1.0.7";
@@ -1193,6 +1215,7 @@ in
       depKeys = [
         ("anyhow-1.0.62")
         ("env_logger-0.9.0")
+        ("filetime-0.2.17")
         ("itertools-0.10.3")
         ("log-0.4.17")
         ("memmap2-0.5.7")
