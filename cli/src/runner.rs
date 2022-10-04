@@ -51,13 +51,23 @@ impl PlatformExec {
 		Ok(())
 	}
 
+	pub fn cache_roots<'a>(&'a self, client: &cache::Client) -> Result<Vec<&'a StoreIdentity>> {
+		let roots: Vec<&StoreIdentity> = self.requirements.iter()
+			.chain(self.exec.iter().map(|x| &x.derivation))
+			.collect();
+
+		for req in roots.iter() {
+			debug!("Caching: {:?}", req);
+			client.cache(req)?;
+		}
+		Ok(roots)
+	}
+
 	pub fn exec<'a, I: Iterator<Item=String>>(&self, client: &cache::Client, paths: &RuntimePaths, mut args: I) -> Result<()> {
 		let mut requirement_paths = Vec::new();
 
-		for req in self.requirements.iter().chain(self.exec.iter().map(|x| &x.derivation)) {
-			debug!("Caching: {:?}", &req);
-			client.cache(&req)?;
-			let store_path = paths.store_path_for(&req);
+		for req in self.cache_roots(client)? {
+			let store_path = paths.store_path_for(req);
 			debug!("Cached: {}", store_path.display());
 			
 			let bin_path = store_path.join("bin");

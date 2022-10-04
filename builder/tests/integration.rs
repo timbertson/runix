@@ -12,6 +12,8 @@ fn run_exe(pname: &str, args: Vec<&str>) -> Result<String> {
 	assert!(Command::new("gup").arg("-u").arg(&path).spawn()?.wait()?.success());
 	let store_path = fs::read_to_string(path)?;
 
+	run(Command::new(runix_exe).arg("--dump").arg(store_path.trim()))?;
+
 	let mut cmd = Command::new(runix_exe);
 	cmd.arg("--require").arg(store_path.trim()).args(args);
 	cmd_output(cmd)

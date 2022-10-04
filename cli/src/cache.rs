@@ -6,9 +6,9 @@ use reqwest::StatusCode;
 use reqwest::blocking::Response;
 use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf, str::FromStr};
 
-use crate::paths::RuntimePaths;
+use crate::{paths::RuntimePaths, store::StoreMeta};
 use crate::rewrite;
-use crate::store::{self, StoreIdentity};
+use crate::store::StoreIdentity;
 use crate::serde_from_string;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -167,7 +167,7 @@ impl Client {
 				}
 				self.download_and_extract(&narinfo)
 			} else {
-				store::touch_meta(&self.paths, entry)
+				StoreMeta::touch(&self.paths, entry)
 			}
 		}
 	}
@@ -258,7 +258,7 @@ impl Client {
 		rewrite::rewrite_all_recursively(&dest, &self.paths.rewrite, &nar_info.references)?;
 		
 		// create the meta file, which signifies the validity of the store path
-		store::write_meta(&self.paths, nar_info)?;
+		StoreMeta::write(&self.paths, nar_info)?;
 
 		info!("Fetched {}", nar_info.identity.display_name());
 		Ok(())

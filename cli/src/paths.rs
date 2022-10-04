@@ -77,11 +77,27 @@ impl RuntimePaths {
 pub mod util {
 	use anyhow::*;
 	use log::*;
-	use std::os::unix::fs::{PermissionsExt, symlink};
+	use std::fmt::Display;
+use std::os::unix::fs::{PermissionsExt, symlink};
 	use std::{fs::{Metadata, self}, path::Path};
 
 	pub fn symlink_metadata<P: AsRef<Path>>(path: P) -> Result<Metadata> {
 		fs::symlink_metadata(&path).with_context(|| format!("stat: {}", path.as_ref().display()))
+	}
+	
+	pub fn rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<()> {
+		let from = from.as_ref();
+		let to = to.as_ref();
+		fs::rename(from, to).with_context(|| format!("Renaming {} -> {}", from.display(), to.display()))
+	}
+	
+	pub fn with_file_ctx<
+		T,
+		F: FnOnce() -> Result<T>,
+		C: Display + Send + Sync + 'static,
+		Ctx: FnOnce() -> C
+	>(ctx: Ctx, block: F) -> Result<T> {
+		block().with_context(ctx)
 	}
 
 	pub fn symlink_force<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) -> Result<()> {

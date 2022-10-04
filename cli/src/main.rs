@@ -6,6 +6,7 @@ mod platform;
 mod runner;
 mod serde_util;
 
+use std::collections::HashSet;
 use std::iter::Peekable;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
@@ -16,7 +17,7 @@ use anyhow::*;
 use log::*;
 use paths::RuntimePaths;
 
-use crate::store::StoreIdentity;
+use crate::store::{StoreIdentity, StoreMeta};
 use crate::paths::RewritePaths;
 use crate::platform::Platform;
 use crate::runner::{RunScript, PlatformExec, Entrypoint, mandatory_arg, mandatory_next_arg};
@@ -58,7 +59,13 @@ pub fn main() -> Result<()> {
 			merge_into(dest, args)
 		},
 
-		// public CLI
+		Some("--dump") => {
+			args.next();
+			let entrypoint = mandatory_next_arg("--dump argument", &mut args)?;
+			dump_entrypoint_or_wrapper(entrypoint)
+		},
+
+		// main CLI
 		_ => default_action(args),
 	}
 }
@@ -161,13 +168,69 @@ fn merge_into<A: Iterator<Item=String>>(dest: String, components: A) -> Result<(
 	runscript.write_to(&dest)
 }
 
+fn is_wrapper_script(arg: &str) -> bool {
+	let p = Path::new(arg);
+	arg.contains('/') && p.exists()
+}
+
+fn dump_entrypoint_or_wrapper(path: String) -> Result<()> {
+	let platform_exec = if is_wrapper_script(&path) {
+		// invoked via shebang
+		RunScript::load(&path)?.get_platform(Platform::current()?)?.to_owned()
+	} else {
+		// expect a single identity
+		PlatformExec {
+			exec: None,
+			requirements: vec!(StoreIdentity::from(path)),
+		}
+	};
+	
+	let paths = paths::RuntimePaths::from_env()?;
+	let roots = platform_exec.cache_roots(
+		&cache::Client {
+			paths: paths.clone(),
+			servers: vec!(RunScript::default_cache()),
+		}
+	)?;
+
+	for root in roots {
+		let mut visited = HashSet::new();
+		dump_visit_entrypoint(&paths, &mut visited, 0, root)?;
+	}
+	Ok(())
+}
+
+fn dump_visit_entrypoint(
+	paths: &RuntimePaths,
+	visited: &mut HashSet<StoreIdentity>,
+	indent: usize,
+	entry: &StoreIdentity
+) -> Result<()> {
+	if visited.contains(entry) {
+		return Ok(())
+	}
+	visited.insert(entry.to_owned());
+	for i in 0 .. indent {
+		if i == (indent-1) {
+			print!("+ ");
+		} else {
+			print!("| ");
+		}
+	}
+	println!("{}", &entry.directory);
+	let meta = StoreMeta::load(paths, entry)?;
+	for child in meta.references() {
+		dump_visit_entrypoint(paths, visited, indent + 1, child)?;
+	}
+	Ok(())
+}
+
 fn default_action<A: Iterator<Item=String>>(mut args: Peekable<A>) -> Result<()> {
 	let first_arg = mandatory_arg("at least one", args.peek())?;
 	let mut platform = Platform::current()?;
 	let mut save_to = None;
-	let script_path = Path::new(&first_arg);
 
-	let run_script = if first_arg.contains('/') && script_path.exists() {
+	let run_script = if is_wrapper_script(&first_arg) {
 		// invoked via shebang
 		let script = RunScript::load(first_arg)?;
 		args.next();
