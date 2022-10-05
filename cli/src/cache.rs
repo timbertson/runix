@@ -160,12 +160,15 @@ impl Client {
 			Ok(())
 		} else {
 			state.checked.insert(entry.to_owned());
-			if let Some(narinfo) = self.fetch_narinfo_if_missing(entry)? {
+			let narinfo = self.fetch_narinfo_if_missing(entry)
+				.with_context(||format!("Fetching narinfo for {:?}", entry))?;
+
+			if let Some(narinfo) = narinfo {
 				// Do dependencies first, we shouldn't write an entry to the sture until it's valid
 				for dep in narinfo.references.iter() {
 					self.cache_with_state(state, dep)?;
 				}
-				self.download_and_extract(&narinfo)
+				self.download_and_extract(&narinfo).with_context(|| format!("Caching {:?}", entry))
 			} else {
 				StoreMeta::touch(&self.paths, entry)
 			}
@@ -217,7 +220,7 @@ impl Client {
 		decompress_cmd.stdout(Stdio::piped());
 
 		debug!("+ {:?}", &decompress_cmd);
-		let mut decompress = decompress_cmd.spawn()?;
+		let mut decompress = decompress_cmd.spawn().with_context(|| format!("Spawning {:?}", &decompress_cmd))?;
 		let mut decompress_in = decompress.stdin.take().expect("missing pipe");
 		let decompress_out = decompress.stdout.take().expect("missing pipe");
 		
@@ -225,12 +228,14 @@ impl Client {
 		let unpack_thread = std::thread::spawn(move || {
 			let result: Result<()> = (|| {
 				let decoder = nix_nar::Decoder::new(decompress_out)?;
-				Ok(decoder.unpack(&extract_to)?)
+				decoder.unpack(&extract_to)
+					.with_context(|| format!("Extracting NAR to {}", extract_to.display()))?;
+				Ok(())
 			})();
 			result
 		});
 
-		response.copy_to(&mut decompress_in)?;
+		response.copy_to(&mut decompress_in).context("Writing response body")?;
 		drop(decompress_in);
 
 		// TODO shouldn't need unwrap, but the types are perplexing...
@@ -249,10 +254,11 @@ impl Client {
 		let url = nar_info.nar_url();
 		debug!("fetching {:?}", &url);
 		let response = reqwest::blocking::get(&url)?;
-		response.error_for_status_ref()?;
+		response.error_for_status_ref().with_context(||format!("Fetching {}", &url))?;
 		debug!("fetch response {:?}", &url);
 		
-		Self::extract(response, nar_info.compression, &dest)?;
+		Self::extract(response, nar_info.compression, &dest)
+			.with_context(|| format!("Extracting {} into {}", &url, dest.display()))?;
 
 		// rewrite rpaths etc.
 		rewrite::rewrite_all_recursively(&dest, &self.paths.rewrite, &nar_info.references)?;

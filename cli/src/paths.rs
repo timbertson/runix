@@ -128,7 +128,7 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 
 	pub fn ensure_writeable<P: AsRef<Path>>(path: P) -> Result<()> {
 		let path = path.as_ref();
-		ensure_writeable_stat(path, &symlink_metadata(path)?)
+		ensure_writeable_stat(path, &symlink_metadata(path).context("ensure_writeable")?)
 	}
 
 	pub fn ensure_executable<P: AsRef<Path>>(path: P) -> Result<()> {
@@ -147,7 +147,7 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 
 	pub fn ensure_unwriteable<P: AsRef<Path>>(path: P) -> Result<()> {
 		let path = path.as_ref();
-		let stat = symlink_metadata(path)?;
+		let stat = symlink_metadata(path).context("ensure_unwriteable")?;
 		let mut perms = stat.permissions();
 		let mode = perms.mode();
 		let unwriteable = mode & !0o222;
@@ -161,15 +161,15 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 
 	pub fn rm_recursive<P: AsRef<Path>>(path: P) -> Result<()> {
 		let path = path.as_ref();
-		let stat = symlink_metadata(path)?;
+		let stat = symlink_metadata(path).context("rm_recursive")?;
 		ensure_writeable_stat(path, &stat)?;
 		if stat.is_dir() {
 			for entry in fs::read_dir(path)? {
 				rm_recursive(entry?.path())?;
 			}
-			fs::remove_dir(path)?;
+			fs::remove_dir(path).with_context(||format!("removing dir {}", path.display()))?;
 		} else {
-			fs::remove_file(path)?;
+			fs::remove_file(path).with_context(||format!("removing file {}", path.display()))?;
 		}
 		Ok(())
 	}
