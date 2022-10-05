@@ -189,7 +189,6 @@ impl Target {
 		Dependency::build_many(targets);
 	}
 
-	
 	fn tarball_name(&self) -> String {
 		format!("runix-{}.tgz", &self.buildable.platform)
 	}

@@ -56,7 +56,7 @@ in
       pname = "atty";
       version = "0.2.14";
       depKeys = [
-        ("libc-0.2.132")
+        ("libc-0.2.134")
       ];
       src = (pkgs.fetchurl {
         hash = "sha256-2bOb4Ydw0RQhzbG5lHpF3T836TCSy/N3YUgooxnV/ug=";
@@ -240,12 +240,56 @@ in
         ("termcolor")
       ];
     };
+    "errno-0.2.8" = {
+      pname = "errno";
+      version = "0.2.8";
+      depKeys = [
+        ("libc-0.2.134")
+      ];
+      src = (pkgs.fetchurl {
+        hash = "sha256-9jkEY1XuTzeUTkT2BkLG86fvo89reMeKDZiajObDlqE=";
+        name = "crate.tar.gz";
+        url = "https://crates.io/api/v1/crates/errno/0.2.8/download";
+      });
+      edition = "2015";
+    };
+    "errno-dragonfly-0.1.2" = {
+      pname = "errno-dragonfly";
+      version = "0.1.2";
+      depKeys = [
+        ("libc-0.2.134")
+      ];
+      src = (pkgs.fetchurl {
+        hash = "sha256-qmjxsSdk+riU0nVdJRh1TnG0/YDs+4InFKEgbCqrOb8=";
+        name = "crate.tar.gz";
+        url = "https://crates.io/api/v1/crates/errno-dragonfly/0.1.2/download";
+      });
+      build = "build.rs";
+      buildDepKeys = [
+        ("cc-1.0.73")
+      ];
+      edition = "2018";
+    };
+    "fd-lock-3.0.6" = {
+      pname = "fd-lock";
+      version = "3.0.6";
+      depKeys = [
+        ("cfg-if-1.0.0")
+        ("rustix-0.35.11")
+      ];
+      src = (pkgs.fetchurl {
+        hash = "sha256-4R3Mfk15qMibmrTG9cMLH8SoPEIHkto1Qv0xF57V9Rc=";
+        name = "crate.tar.gz";
+        url = "https://crates.io/api/v1/crates/fd-lock/3.0.6/download";
+      });
+      edition = "2018";
+    };
     "filetime-0.2.17" = {
       pname = "filetime";
       version = "0.2.17";
       depKeys = [
         ("cfg-if-1.0.0")
-        ("libc-0.2.132")
+        ("libc-0.2.134")
       ];
       src = (pkgs.fetchurl {
         hash = "sha256-6Up7uqWTVLwg3XW2fyPieXtEkOnWkoID+xBceeRIyGw=";
@@ -501,7 +545,7 @@ in
       pname = "hermit-abi";
       version = "0.1.19";
       depKeys = [
-        ("libc-0.2.132")
+        ("libc-0.2.134")
       ];
       src = (pkgs.fetchurl {
         hash = "sha256-YrRnNDuUukdtyyUA0kLa27OVV9+IkxCsd8XZkQCqrDM=";
@@ -673,6 +717,19 @@ in
         ("std")
       ];
     };
+    "io-lifetimes-0.7.3" = {
+      pname = "io-lifetimes";
+      version = "0.7.3";
+      depKeys = [
+      ];
+      src = (pkgs.fetchurl {
+        hash = "sha256-HqN/NVwF3edbhLui12eQatUi6XzZ4u7yvnpKt/tELAY=";
+        name = "crate.tar.gz";
+        url = "https://crates.io/api/v1/crates/io-lifetimes/0.7.3/download";
+      });
+      build = "build.rs";
+      edition = "2018";
+    };
     "ipnet-2.5.0" = {
       pname = "ipnet";
       version = "2.5.0";
@@ -755,21 +812,40 @@ in
       });
       edition = "2015";
     };
-    "libc-0.2.132" = {
+    "libc-0.2.134" = {
       pname = "libc";
-      version = "0.2.132";
+      version = "0.2.134";
       depKeys = [
       ];
       src = (pkgs.fetchurl {
-        hash = "sha256-g3Hk5TQcOpbbEn6yRlrGgc7UxDPgHdDpOK2+8mupO6U=";
+        hash = "sha256-MpyTNUhza8Sf1XXuaMiei+TSYAZBhDiaW3dRfN3Zn/s=";
         name = "crate.tar.gz";
-        url = "https://crates.io/api/v1/crates/libc/0.2.132/download";
+        url = "https://crates.io/api/v1/crates/libc/0.2.134/download";
       });
       build = "build.rs";
       edition = "2015";
       features = [
         ("default")
+        ("extra_traits")
         ("std")
+      ];
+    };
+    "linux-raw-sys-0.0.46" = {
+      pname = "linux-raw-sys";
+      version = "0.0.46";
+      depKeys = [
+      ];
+      src = (pkgs.fetchurl {
+        hash = "sha256-1NJFbDcyMaIIrSlMM9xb/zAFHq/ZVM1Mqug6cSsShU0=";
+        name = "crate.tar.gz";
+        url = "https://crates.io/api/v1/crates/linux-raw-sys/0.0.46/download";
+      });
+      edition = "2018";
+      features = [
+        ("errno")
+        ("general")
+        ("ioctl")
+        ("no_std")
       ];
     };
     "lock_api-0.4.8" = {
@@ -840,7 +916,7 @@ in
       pname = "memmap2";
       version = "0.5.7";
       depKeys = [
-        ("libc-0.2.132")
+        ("libc-0.2.134")
       ];
       src = (pkgs.fetchurl {
         hash = "sha256-la8V80WxevLvyOrWCA+4vDdvjOwbNSd7k1Y3WV/ndJg=";
@@ -865,7 +941,7 @@ in
       pname = "mio";
       version = "0.8.4";
       depKeys = [
-        ("libc-0.2.132")
+        ("libc-0.2.134")
         ("log-0.4.17")
       ];
       src = (pkgs.fetchurl {
@@ -899,7 +975,7 @@ in
       pname = "num_cpus";
       version = "1.13.1";
       depKeys = [
-        ("libc-0.2.132")
+        ("libc-0.2.134")
       ];
       src = (pkgs.fetchurl {
         hash = "sha256-GeZFJuve4YI0FXLlDprQOWWqUQzZRCekVJRI8oXpV6E=";
@@ -948,7 +1024,7 @@ in
       version = "0.9.3";
       depKeys = [
         ("cfg-if-1.0.0")
-        ("libc-0.2.132")
+        ("libc-0.2.134")
         ("smallvec-1.9.0")
       ];
       src = (pkgs.fetchurl {
@@ -1187,7 +1263,7 @@ in
       pname = "ring";
       version = "0.16.20";
       depKeys = [
-        ("libc-0.2.132")
+        ("libc-0.2.134")
         ("once_cell-1.13.1")
         ("spin-0.5.2")
         ("untrusted-0.7.1")
@@ -1215,6 +1291,7 @@ in
       depKeys = [
         ("anyhow-1.0.62")
         ("env_logger-0.9.0")
+        ("fd-lock-3.0.6")
         ("filetime-0.2.17")
         ("itertools-0.10.3")
         ("log-0.4.17")
@@ -1250,6 +1327,39 @@ in
         })
       ];
       edition = "2021";
+    };
+    "rustix-0.35.11" = {
+      pname = "rustix";
+      version = "0.35.11";
+      depKeys = [
+        ("bitflags-1.3.2")
+        ("io-lifetimes-0.7.3")
+        ("libc-0.2.134")
+        ("linux-raw-sys-0.0.46")
+      ];
+      src = (pkgs.fetchurl {
+        hash = "sha256-+7L9pGZt7xQzsbBUMatALkKhCEKFR3Iity1sVkxBfO8=";
+        name = "crate.tar.gz";
+        url = "https://crates.io/api/v1/crates/rustix/0.35.11/download";
+      });
+      build = "build.rs";
+      crateRenames = {
+        errno = [
+          ({
+            rename = "libc_errno";
+            version = "0.2.8";
+          })
+        ];
+      };
+      edition = "2018";
+      features = [
+        ("default")
+        ("fs")
+        ("io-lifetimes")
+        ("libc")
+        ("std")
+        ("use-libc-auxv")
+      ];
     };
     "rustls-0.20.6" = {
       pname = "rustls";
@@ -1492,7 +1602,7 @@ in
       pname = "socket2";
       version = "0.4.6";
       depKeys = [
-        ("libc-0.2.132")
+        ("libc-0.2.134")
       ];
       src = (pkgs.fetchurl {
         hash = "sha256-EMmLujcbmyKnGpQU5CD5Ld6yNpI5rwggCBYWnV4t16o=";
@@ -1619,7 +1729,7 @@ in
       version = "1.20.1";
       depKeys = [
         ("bytes-1.2.1")
-        ("libc-0.2.132")
+        ("libc-0.2.134")
         ("memchr-2.5.0")
         ("mio-0.8.4")
         ("num_cpus-1.13.1")
@@ -2088,6 +2198,7 @@ in
         ("minwinbase")
         ("minwindef")
         ("namedpipeapi")
+        ("ntdef")
         ("ntsecapi")
         ("processenv")
         ("std")
@@ -2154,6 +2265,8 @@ in
       features = [
         ("Win32")
         ("Win32_Foundation")
+        ("Win32_NetworkManagement")
+        ("Win32_NetworkManagement_IpHelper")
         ("Win32_Networking")
         ("Win32_Networking_WinSock")
         ("Win32_Security")
@@ -2164,6 +2277,7 @@ in
         ("Win32_System_LibraryLoader")
         ("Win32_System_Pipes")
         ("Win32_System_SystemServices")
+        ("Win32_System_Threading")
         ("Win32_System_WindowsProgramming")
         ("default")
       ];

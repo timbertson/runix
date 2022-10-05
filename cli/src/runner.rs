@@ -46,8 +46,8 @@ impl PlatformExec {
 		let tmp_symlink = Path::new(paths.rewrite.tmp_dest);
 		let dest_store = &paths.store_path;
 		// TODO: don't bother if it's already correct?
-		debug!("Linking {:?} -> {:?}", tmp_symlink, &dest_store);
-		paths::util::symlink_force(&dest_store, tmp_symlink)?;
+		paths::util::symlink_force(&dest_store, tmp_symlink)
+			.with_context(|| format!("Linking {:?} -> {:?}", tmp_symlink, &dest_store))?;
 		Ok(())
 	}
 
@@ -96,12 +96,13 @@ impl PlatformExec {
 		// debug!("Injecting: {:?}", inject);
 		
 		Self::install_symlink(paths)?;
-		Err(cmd
+		let exec: Result<()> = Err(cmd
 			// .env("DYLD_INSERT_LIBRARIES", inject)
 			// .env("DYLD_FORCE_FLAT_NAMESPACE", "1")
 			.env("RUNIX_ROOT", &paths.runix_root)
 			.env("PATH", child_path)
-			.exec().into())
+			.exec().into());
+		exec.with_context(|| format!("Executing {:?}", &cmd))
 	}
 }
 

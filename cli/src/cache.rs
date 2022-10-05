@@ -151,7 +151,7 @@ impl Default for ClientState {
 impl Client {
 	pub fn cache(&self, entry: &StoreIdentity) -> Result<()> {
 		let mut state = ClientState::default();
-		self.cache_with_state(&mut state, entry)
+		self.paths.with_lock(|| self.cache_with_state(&mut state, entry))
 	}
 	
 	fn cache_with_state(&self, state: &mut ClientState, entry: &StoreIdentity) -> Result<()> {

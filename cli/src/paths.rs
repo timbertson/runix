@@ -1,5 +1,7 @@
 use anyhow::*;
-use std::{env, path::PathBuf};
+use log::*;
+use std::{env, path::PathBuf, fs::{self, File, OpenOptions}};
+use fd_lock::RwLock;
 
 use crate::store::StoreIdentity;
 
@@ -38,6 +40,7 @@ pub struct RuntimePaths {
 	pub runix_root: String,
 	pub store_path: PathBuf,
 	pub meta_path: PathBuf,
+	pub lock_path: PathBuf,
 }
 
 impl RuntimePaths {
@@ -64,12 +67,31 @@ impl RuntimePaths {
 		let rewrite = RewritePaths::default();
 		let store_path = PathBuf::from(format!("{}{}", runix_root, rewrite.src));
 		let meta_path = store_path.parent().unwrap().join("info");
+		let lock_path = PathBuf::from(format!("{}/lock", runix_root));
 		Ok(Self {
 			rewrite,
 			runix_root,
 			store_path,
 			meta_path,
+			lock_path,
 		})
+	}
+	
+	pub fn with_lock<T, F: FnOnce() -> Result<T>>(&self, f: F) -> Result<T> {
+		fs::create_dir_all(&self.runix_root)?;
+		debug!("Acquiring lock {}", self.lock_path.display());
+		let mut lockfile = RwLock::new(OpenOptions::new()
+			.create(true)
+			.write(true)
+			.truncate(true)
+			.open(&self.lock_path).context("opening lockfile")?);
+
+		let lock = lockfile.write()?;
+		debug!("Acquired lock");
+		let result = f();
+		debug!("Releasing lock");
+		drop(lock);
+		result
 	}
 }
 
