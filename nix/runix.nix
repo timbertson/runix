@@ -1,11 +1,22 @@
 { platform ? null }:
+
 let
-	nixPlatform = builtins.getAttr platform {
+	_platformArg = platform;
+	sources = import ./sources.nix {};
+	getNixPlatform = p: builtins.getAttr p {
 		"Darwin-aarch64" = "aarch64-apple-darwin";
 		"Darwin-x86_64" = "x86_64-apple-darwin";
 		"Linux-x86_64" = "x86_64-unknown-linux-musl";
 	};
-	sources = import ./sources.nix {};
+in
+
+let
+	# reset platform to `null` if it matches the current system
+	platform =
+		if _platformArg == null
+			|| (getNixPlatform _platformArg == (import sources.nixpkgs {}).stdenv.hostPlatform.config)
+			then null else _platformArg;
+	nixPlatform = getNixPlatform platform;
 
 	### baseOverlay:
 	# provides the base runix overlay, including fenix, wrappers + rust crates
@@ -120,8 +131,8 @@ let
 					newDependency = emptyLibsystem;
 					drv = pkgsBuildBuild.replaceDependency {
 						inherit drv;
-						oldDependency = lib.warn "REAL CF: ${realCF}" (builtins.unsafeDiscardStringContext realCF);
-						newDependency = lib.warn "EMPTY: ${emptyCF}" emptyCF;
+						oldDependency = lib.trace "real cf: ${realCF}" (builtins.unsafeDiscardStringContext realCF);
+						newDependency = emptyCF;
 					};
 				}
 			) else drv;
@@ -253,7 +264,7 @@ EOF
 	vanillaPkgs = import sources.nixpkgs {
 		overlays = commonOverlays;
 	};
-
+	
 	crossPkgs = if platform == null then vanillaPkgs else import sources.nixpkgs {
 		crossSystem.config = nixPlatform;
 		overlays = commonOverlays ++ [crossOverlay];

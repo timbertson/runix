@@ -82,7 +82,7 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 	use std::{fs::{Metadata, self}, path::Path};
 
 	pub fn symlink_metadata<P: AsRef<Path>>(path: P) -> Result<Metadata> {
-		fs::symlink_metadata(&path).with_context(|| format!("stat: {}", path.as_ref().display()))
+		fs::symlink_metadata(&path).with_context(|| format!("lstat: {}", path.as_ref().display()))
 	}
 	
 	pub fn rename<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<()> {

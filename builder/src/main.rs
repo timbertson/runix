@@ -170,14 +170,7 @@ impl Target {
 					"bootstrap.drv" => {
 						self.always_rebuild();
 						let mut cmd = Command::new("nix-build");
-
-						if self.buildable.platform == current_platform() {
-							log!("Building current platform");
-							cmd.arg("--arg").arg("platform").arg("null");
-						} else {
-							log!("Cross-building for {:}", &self.buildable.platform);
-							cmd.arg("--argstr").arg("platform").arg(&self.buildable.platform);
-						}
+						cmd.arg("--argstr").arg("platform").arg(&self.buildable.platform);
 						cmd.arg("../").arg("--out-link").arg(&self.output);
 						run(cmd);
 						run_input_ref(&self.output.to_str().unwrap(), Command::new("gup").arg("--contents"));
