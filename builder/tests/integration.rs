@@ -108,16 +108,16 @@ fn current_platform() -> Result<String> {
 #[serial]
 #[ignore]
 fn local_bootstrap() -> Result<()> {
-	let platform_build = format!("build/platforms/{}", current_platform()?);
+	let platform_build = format!("../build/platforms/{}", current_platform()?);
 	run(Command::new("gup")
 		.arg("-u")
-		.arg("../build/platforms/current/bootstrap")
+		.arg(format!("{}/archive", &platform_build))
 	)?;
 
 	test_in_temp_runix(|root| {
 		run(Command::new("../bootstrap.sh")
 			.env("RUNIX_ROOT", root)
-			.env("LOCAL_BOOTSTRAP", format!("../{}", &platform_build))
+			.env("LOCAL_BOOTSTRAP", platform_build)
 		)
 	})
 }

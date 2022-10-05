@@ -1,6 +1,6 @@
-#!bash -eu
-gup --always
-FLAGS="--include-ignored --nocapture --color=always"
+#!/usr/bin/env bash
+set -eu
+FLAGS="--nocapture --color=always $*"
 if [ -n "${RUNIX_TESTS:-}" ]; then
 	# inside CI / nix-shell; precompiled tests
 	cd ./builder
