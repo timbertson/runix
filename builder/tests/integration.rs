@@ -111,7 +111,7 @@ fn local_bootstrap() -> Result<()> {
 	let platform_build = format!("../build/platforms/{}", current_platform()?);
 	run(Command::new("gup")
 		.arg("-u")
-		.arg(format!("{}/archive", &platform_build))
+		.arg(format!("{}/bootstrap", &platform_build))
 	)?;
 
 	test_in_temp_runix(|root| {
