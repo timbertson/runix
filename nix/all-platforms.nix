@@ -1,6 +1,9 @@
-let platform = p: import ./default.nix { platform = p; }; in
-[
-	(platform "Darwin-x86_64")
-	(platform "Darwin-aarch64")
-	(platform "Linux-x86_64")
-]
+with builtins;
+listToAttrs (map (platform: {
+	name = platform;
+	value = import ./default.nix { inherit platform; };
+}) [
+	"Darwin-x86_64"
+	"Linux-x86_64"
+	"Darwin-aarch64"
+])

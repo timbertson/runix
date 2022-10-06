@@ -74,19 +74,19 @@ impl Target {
 						// release all platform assets
 						self.build_all("release");
 
-						// and also release the runscript:
+						// Now release the runscript. This needs to happen after
+						// the above targets have built, since they populate the cache.
 						let runscript_path = self.dependency("runscript").path();
 						github::Release::fetch("bootstrap").replace_asset(&runscript_path);
 					},
 
 					"runscript" => {
-						self.build_all("bootstrap");
-						let wrapper_scripts = all_platforms().into_iter().map(|platform| {
-							self.platform_dependency(platform, "bootstrap.dir").path() + "/wrapper"
-						});
 						run_ref(Command::new(runix_exe())
-							.arg("--merge-into").arg(&self.output)
-							.args(wrapper_scripts)
+							.arg("--save").arg(&self.output)
+							.arg("--multiplatform")
+							.arg("--entrypoint")
+								.arg("import ../nix/all-platforms.nix")
+								.arg("bin/runix")
 						);
 					},
 

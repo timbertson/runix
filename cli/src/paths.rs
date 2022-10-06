@@ -1,6 +1,6 @@
 use anyhow::*;
 use log::*;
-use std::{env, path::PathBuf, fs::{self, File, OpenOptions}};
+use std::{env, path::PathBuf, fs::{self, OpenOptions}};
 use fd_lock::RwLock;
 
 use crate::store::StoreIdentity;
@@ -45,7 +45,7 @@ pub struct RuntimePaths {
 
 impl RuntimePaths {
 	pub fn store_path_for(&self, entry: &StoreIdentity) -> PathBuf {
-		self.store_path.join(&entry.directory)
+		self.store_path.join(entry.directory())
 	}
 
 	pub fn from_env() -> Result<Self> {

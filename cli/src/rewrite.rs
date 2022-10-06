@@ -102,8 +102,8 @@ mod tests {
 		RewriteReferences::new(
 			&RewritePaths::default(),
 			&vec!(
-				StoreIdentity::from("abcd-v1".to_owned()),
-				StoreIdentity::from("ghij-v1".to_owned()),
+				StoreIdentity::unsafe_from("abcd-v1"),
+				StoreIdentity::unsafe_from("ghij-v1"),
 			)
 		).unwrap()
 	}

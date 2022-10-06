@@ -11,4 +11,8 @@ impl="$(cat "$store_path")"
 	--save "$1" \
 	--entrypoint "$impl" bin/"$pname"
 
-chmod +x "$1"
+# create an auto-bootstrap version too
+./runix \
+	--save "$2.bootstrap" \
+	--auto-bootstrap \
+	--entrypoint "$impl" bin/"$pname"

@@ -5,6 +5,7 @@ mod store;
 mod platform;
 mod runner;
 mod serde_util;
+mod nix_evaluate;
 
 use std::collections::HashSet;
 use std::iter::Peekable;
@@ -16,6 +17,7 @@ use std::env;
 use anyhow::*;
 use log::*;
 use paths::RuntimePaths;
+use runner::ScriptType;
 
 use crate::store::{StoreIdentity, StoreMeta};
 use crate::paths::RewritePaths;
@@ -49,7 +51,7 @@ pub fn main() -> Result<()> {
 		// invokes this to activate itself
 		Some("--make-current") => {
 			args.next();
-			let identity = StoreIdentity::from(mandatory_next_arg("--make-current store ID", &mut args)?);
+			let identity = StoreIdentity::new(mandatory_next_arg("--make-current store ID", &mut args)?)?;
 			make_current(&paths::RuntimePaths::from_env()?, &identity)
 		},
 
@@ -78,7 +80,7 @@ fn generate_bootstrap<A: Iterator<Item=String>>(mut args: Peekable<A>) -> Result
 	for entry in base.read_dir()? {
 		let entry = entry?;
 		paths.push(entry.path());
-		references.push(StoreIdentity::from(entry.file_name().to_string_lossy().into_owned()));
+		references.push(StoreIdentity::new(entry.file_name().to_string_lossy().into_owned())?);
 	}
 
 	for path in paths {
@@ -151,7 +153,7 @@ fn self_install(script_path: String) -> Result<()> {
 
 	// Script looks valid. Make sure there's a symlink on $PATH, then execute it to finish install
 	install_symlink_to_current_on_path(&paths)?;
-	let args = vec!("--make-current".to_owned(), store_identity.directory.to_owned());
+	let args = vec!("--make-current".to_owned(), store_identity.directory().to_owned());
 	script.exec(platform, args.into_iter())
 }
 
@@ -165,7 +167,7 @@ fn merge_into<A: Iterator<Item=String>>(dest: String, components: A) -> Result<(
 		}
 	}
 	let runscript = runscript.ok_or_else(|| anyhow!("At least one runscript required to merge"))?;
-	runscript.write_to(&dest)
+	runscript.write_to(&dest, ScriptType::Standard)
 }
 
 fn is_wrapper_script(arg: &str) -> bool {
@@ -181,7 +183,7 @@ fn dump_entrypoint_or_wrapper(path: String) -> Result<()> {
 		// expect a single identity
 		PlatformExec {
 			exec: None,
-			requirements: vec!(StoreIdentity::from(path)),
+			requirements: vec!(StoreIdentity::new(path)?),
 		}
 	};
 	
@@ -217,7 +219,7 @@ fn dump_visit_entrypoint(
 			print!("| ");
 		}
 	}
-	println!("{}", &entry.directory);
+	println!("{}", entry.directory());
 	let meta = StoreMeta::load(paths, entry)?;
 	for child in meta.references() {
 		dump_visit_entrypoint(paths, visited, indent + 1, child)?;
@@ -227,8 +229,9 @@ fn dump_visit_entrypoint(
 
 fn default_action<A: Iterator<Item=String>>(mut args: Peekable<A>) -> Result<()> {
 	let first_arg = mandatory_arg("at least one", args.peek())?;
-	let mut platform = Platform::current()?;
+	let mut single_platform = Platform::current()?;
 	let mut save_to = None;
+	let mut script_type = ScriptType::Standard;
 
 	let run_script = if is_wrapper_script(&first_arg) {
 		// invoked via shebang
@@ -237,11 +240,11 @@ fn default_action<A: Iterator<Item=String>>(mut args: Peekable<A>) -> Result<()>
 		script
 	} else {
 		// Explicit CLI usage
-		let mut platform_exec = PlatformExec {
-			exec: None,
-			requirements: vec!(),
-		};
-		let mut entrypoint = None;
+		let mut requirements = vec!();
+		let mut entrypoint_arg = None;
+		let mut is_multiplatform = false;
+		let mut is_expr = false;
+
 		let mut run_script = RunScript::default();
 
 		while let Some(argstr) = args.peek() {
@@ -253,17 +256,26 @@ USAGE:
   runix --merge-into DEST [...RUNSCRIPTS]
 
 OPTIONS:
---require IDENTITY              Add this store name as a requirement.
---with-cache URI                Add this server to the list of caches used.
---save PATH                     Save a runscript, instead of executing directly.
---entrypoint IDENTITY RELPATH   Set the entrypoint derivation & path to run. If no entrypoint is given,
-                                runix will execute ARGS (after fetching requirments and setting up $PATH).
+--require IDENTITY     Add this store name as a requirement.
+--with-cache URI       Add this server to the list of caches used.
+
+SAVING A RUNSCRIPT (WRAPPER)
+--save PATH            Save a runscript, instead of executing directly.
+--auto-bootstrap       Make a runscript self-bootstrapping
+
+--entrypoint VALUE RELPATH
+                       Set the entrypoint & path to run. If no entrypoint is given,
+                       runix will execute ARGV (after fetching requirments and setting up $PATH).
+                       The VALUE is by default a store identity, but can be changed with --expr.
+--expr                 Treat the entrypoint VALUE as a nix expression.
+--multiplatform        Treat the entrypoint VALUE as a nix expression returning an attrset of
+                       `platform: derivation`. Implies `--expr`.
 "#);
 				return Ok(());
 			} else if argstr == "--require" {
 				args.next();
-				let entry = StoreIdentity::from(mandatory_next_arg("--require value", &mut args)?);
-				platform_exec.requirements.push(entry);
+				let entry = StoreIdentity::new(mandatory_next_arg("--require value", &mut args)?)?;
+				requirements.push(entry);
 			} else if argstr == "--with-cache" {
 				args.next();
 				let server = cache::Server::from(mandatory_next_arg("--add-cache value", &mut args)?);
@@ -271,14 +283,24 @@ OPTIONS:
 			} else if argstr == "--save" {
 				args.next();
 				save_to = Some(mandatory_next_arg("--save value", &mut args)?);
+			} else if argstr == "--auto-bootstrap" {
+				args.next();
+				script_type = ScriptType::AutoBootstrap;
 			} else if argstr == "--platform" {
 				args.next();
-				platform = Platform::from_str(&mandatory_next_arg("--platform value", &mut args)?)?;
+				single_platform = Platform::from_str(&mandatory_next_arg("--platform value", &mut args)?)?;
 			} else if argstr == "--entrypoint" {
 				args.next();
-				let derivation = StoreIdentity::from(mandatory_next_arg("--entrypoint derivation", &mut args)?);
-				let path = mandatory_next_arg("--entrypoint path", &mut args)?;
-				entrypoint = Some(Entrypoint { derivation, path });
+				entrypoint_arg = Some((
+					mandatory_next_arg("--entrypoint value", &mut args)?,
+					mandatory_next_arg("--entrypoint relpath", &mut args)?
+				));
+			} else if argstr == "--multiplatform" {
+				args.next();
+				is_multiplatform = true;
+			} else if argstr == "--expr" {
+				args.next();
+				is_expr = true;
 			} else if argstr.starts_with("--") {
 				return Err(anyhow!("Unknown option: {}", argstr));
 			} else {
@@ -286,11 +308,31 @@ OPTIONS:
 			}
 		}
 
-		if let Some(entrypoint) = entrypoint {
-			platform_exec.set_entrypoint(entrypoint);
-		}
-
-		run_script.add_platform(platform, platform_exec);
+		match entrypoint_arg {
+			None => run_script.add_platform(single_platform, PlatformExec { exec: None, requirements }),
+			Some((value, relpath)) => {
+				debug!("Computing entrypoint...");
+				let mut add_entrypoint = |platform, derivation: StoreIdentity, relpath| {
+					run_script.add_platform(platform, PlatformExec {
+						requirements: requirements.clone(),
+						exec: Some(Entrypoint {
+							derivation: StoreIdentity::from(derivation),
+							path: relpath,
+						}),
+					})
+				};
+				if is_multiplatform {
+					for (platform, path) in nix_evaluate::evaluate_multi(&value)? {
+						add_entrypoint(Platform::from_str(&platform)?, StoreIdentity::from_path(&path)?, relpath.clone());
+					}
+				} else if is_expr {
+					let store_path = nix_evaluate::evaluate_single(&value)?;
+					add_entrypoint(single_platform, StoreIdentity::from_path(&store_path)?, relpath);
+				} else {
+					add_entrypoint(single_platform, StoreIdentity::new(value)?, relpath);
+				}
+			}
+		};
 		run_script
 	};
 
@@ -300,8 +342,8 @@ OPTIONS:
 			if args.next().is_some() {
 				return Err(anyhow!("Too many arguments for --save operation"));
 			}
-			run_script.write_to(&save_to)
+			run_script.write_to(&save_to, script_type)
 		},
-		None => run_script.exec(platform, args),
+		None => run_script.exec(single_platform, args),
 	}
 }

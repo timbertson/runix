@@ -108,17 +108,20 @@ impl FromStr for Platform {
 	type Err = anyhow::Error;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		let mut parts = s.split('-');
-		let os = parts.next();
-		let arch = parts.next();
-		let more = parts.next();
-		match (arch, os, more) {
-			(Some(arch), Some(os), None) => Ok(Self {
-				arch: Arch::from_str(arch)?,
-				os: OS::from_str(os)?,
-			}),
-			_ => Err(anyhow!("Can't parse platform: {}", s))
-		}
+		let inner: Result<Self> = (|| {
+			let mut parts = s.split('-');
+			let os = parts.next();
+			let arch = parts.next();
+			let more = parts.next();
+			match (os, arch, more) {
+				(Some(os), Some(arch), None) => Ok(Self {
+					os: OS::from_str(os)?,
+					arch: Arch::from_str(arch)?,
+				}),
+				_ => Err(anyhow!("Invalid platform"))
+			}
+		})();
+		inner.with_context(||format!("Parsing platform: {}", s))
 	}
 }
 

@@ -42,10 +42,15 @@ fn run(cmd: &mut Command) -> Result<()> {
 	}
 }
 
-fn run_wrapper(pname: &str, args: Vec<&str>) -> Result<String> {
+fn build_wrapper(pname: &str) -> PathBuf {
 	let mut path = PathBuf::from("../build/wrappers");
 	path.push(pname);
-	assert!(Command::new("gup").arg("-u").arg(&path).spawn()?.wait()?.success());
+	assert!(Command::new("gup").arg("-u").arg(&path).spawn().unwrap().wait().unwrap().success());
+	path
+}
+
+fn run_wrapper(pname: &str, args: Vec<&str>) -> Result<String> {
+	let path = build_wrapper(pname);
 	let mut cmd = Command::new(path);
 	cmd.args(args);
 	cmd_output(cmd)
@@ -121,6 +126,31 @@ fn local_bootstrap() -> Result<()> {
 		)
 	})
 }
+
+#[test]
+#[serial]
+#[ignore]
+fn local_auto_bootstrap() -> Result<()> {
+	let platform_build = format!("../build/platforms/{}", current_platform()?);
+	run(Command::new("gup")
+		.arg("-u")
+		.arg(format!("{}/bootstrap", &platform_build))
+	)?;
+	let mut jq_wrapper = build_wrapper("jq");
+	jq_wrapper.set_extension(".bootstrap");
+
+	test_in_temp_runix(|root| {
+		let mut cmd = Command::new(jq_wrapper);
+		cmd.arg("--help")
+			.env("RUNIX_ROOT", root)
+			.env("LOCAL_BOOTSTRAP", platform_build);
+		let output = cmd_output(cmd)?;
+		assert_contains("Note: runix not detected; bootstrapping ...", &output)?;
+		assert_contains("jq - commandline JSON processor", &output)?;
+		Ok(())
+	})
+}
+
 
 fn all_platforms() -> Vec<&'static str> {
 	vec!(

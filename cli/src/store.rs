@@ -17,19 +17,50 @@ impl<'a> Display for StoreIdentityNameDisplay<'a> {
 // The directory name within /nix/store, including both the hash and the name
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct StoreIdentity {
-	pub directory: String,
+	directory: String,
 }
 
 serde_from_string!(StoreIdentity);
 
 impl StoreIdentity {
+	pub fn new(s: String) -> Result<Self> {
+		if !s.contains('/') {
+			let (hash, _) = Self::validate_pair(&s)?;
+			if hash.len() == 32 {
+				return Ok(Self { directory: s })
+			}
+		}
+		Err(Self::invalid(&s))
+	}
+
+	fn invalid(s: &str) -> Error {
+		anyhow!("Invalid store identity: {}", &s)
+	}
+
+	fn validate_pair(directory: &str) -> Result<(&str, &str)> {
+		directory.split_once('-').ok_or_else(|| Self::invalid(directory))
+	}
+
+	pub fn from_path(p: &str) -> Result<Self> {
+		// extract the last path component
+		Self::from_str(p.rsplit('/').next().unwrap())
+	}
+	
+	// used only in tests
+	#[allow(unused)]
+	pub fn unsafe_from(directory: &str) -> Self { Self { directory: directory.to_owned() } }
+
 	pub fn hash(&self) -> &str {
 		self.pair().0
 	}
 
+	pub fn directory(&self) -> &str {
+		&self.directory
+	}
+
 	fn pair(&self) -> (&str, &str) {
-		self.directory.split_once('-')
-			.unwrap_or_else(|| panic!("Invalid store identity: {}", &self.directory))
+		// validated upon construction, so this should never fail
+		Self::validate_pair(&self.directory).unwrap()
 	}
 
 	pub fn display_name(&self) -> StoreIdentityNameDisplay<'_> {
@@ -37,15 +68,19 @@ impl StoreIdentity {
 	}
 }
 
-impl From<String> for StoreIdentity {
-	fn from(directory: String) -> Self {
-		Self { directory }
+impl TryFrom<String> for StoreIdentity {
+	type Error = anyhow::Error;
+
+	fn try_from(directory: String) -> Result<Self> {
+		Self::new(directory)
 	}
 }
 
-impl From<&str> for StoreIdentity {
-	fn from(directory: &str) -> Self {
-		Self::from(directory.to_owned())
+impl TryFrom<&str> for StoreIdentity {
+	type Error = anyhow::Error;
+
+	fn try_from(directory: &str) -> Result<Self> {
+		Self::new(directory.to_owned())
 	}
 }
 
@@ -53,7 +88,7 @@ impl FromStr for StoreIdentity {
 	type Err = Error;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		Ok(Self::from(s))
+		Self::try_from(s)
 	}
 }
 

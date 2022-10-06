@@ -110,7 +110,7 @@ impl<'a> NarInfo<'a> {
 						compression = Some(Compression::parse(words.next().ok_or_else(value_required)?)?);
 					},
 					"References:" => {
-						references = Some(words.map(StoreIdentity::from).collect::<Vec<StoreIdentity>>());
+						references = Some(words.map(StoreIdentity::try_from).collect::<Result<Vec<StoreIdentity>>>()?);
 					},
 					_ => (),
 				}
@@ -176,8 +176,8 @@ impl Client {
 	}
 
 	fn fetch_narinfo_if_missing<'a>(&'a self, entry: &'a StoreIdentity) -> Result<Option<NarInfo<'a>>> {
-		let dest_path = self.paths.store_path.join(&entry.directory);
-		let meta_path = self.paths.meta_path.join(&entry.directory);
+		let dest_path = self.paths.store_path.join(entry.directory());
+		let meta_path = self.paths.meta_path.join(entry.directory());
 		// TODO: locking for concurrent processes
 		if meta_path.exists() && dest_path.exists() {
 			debug!("Cache path already exists: {:?}", dest_path);
@@ -245,7 +245,7 @@ impl Client {
 
 	fn download_and_extract(&self, nar_info: &NarInfo<'_>) -> Result<()> {
 		fs::create_dir_all(&self.paths.store_path)?;
-		let dest = self.paths.store_path.join(&nar_info.identity.directory);
+		let dest = self.paths.store_path.join(nar_info.identity.directory());
 		if dest.exists() {
 			// remove previous attempt
 			crate::paths::util::rm_recursive(&dest)?;

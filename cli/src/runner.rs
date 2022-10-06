@@ -38,10 +38,6 @@ pub fn mandatory_arg<T>(desc: &'static str, arg: Option<T>) -> Result<T> {
 }
 
 impl PlatformExec {
-	pub fn set_entrypoint(&mut self, entrypoint: Entrypoint) {
-		self.exec = Some(entrypoint)
-	}
-	
 	fn install_symlink(paths: &RuntimePaths) -> Result<()> {
 		let tmp_symlink = Path::new(paths.rewrite.tmp_dest);
 		let dest_store = &paths.store_path;
@@ -106,6 +102,11 @@ impl PlatformExec {
 	}
 }
 
+pub enum ScriptType {
+	Standard,
+	AutoBootstrap,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunScript {
 	caches: Vec<cache::Server>,
@@ -129,21 +130,39 @@ impl RunScript {
 		self.caches.push(server)
 	}
 
-	pub fn write_to(&self, path: &str) -> Result<()> {
+	pub fn write_to(&self, path: &str, script_type: ScriptType) -> Result<()> {
 		if path == "-" {
-			self.write(std::io::stdout())
+			self.write(std::io::stdout(), script_type)
 		} else {
 			let dest = fs::OpenOptions::new()
 				.write(true)
 				.truncate(true)
 				.create(true)
 				.open(path)?;
-			self.write(dest)?;
+			self.write(dest, script_type)?;
 			paths::util::ensure_executable(path)
 		}
 	}
 
-	pub fn write<D: Write>(&self, mut dest: D) -> Result<()> {
+	pub fn write<D: Write>(&self, mut dest: D, script_type: ScriptType) -> Result<()> {
+		match script_type {
+			ScriptType::Standard => (),
+			ScriptType::AutoBootstrap => {
+				write!(&mut dest, "#!/bin/sh")?;
+				write!(&mut dest, r#"
+set -eu
+RUNIX_ROOT="${{RUNIX_ROOT:-$HOME/.cache/runix}}"
+RUNIX_BIN="$RUNIX_ROOT/current/bin/runix"
+if ! test -x "$RUNIX_BIN"; then
+	echo >&2 'Note: runix not detected; bootstrapping ...'
+	export RUNIX_ROOT
+	curl -sSL https://raw.githubusercontent.com/timbertson/runix/main/bootstrap.sh | bash
+fi
+exec "$RUNIX_BIN" "$0" "$@"
+
+"#)?;
+			},
+		}
 		write!(&mut dest, "#!/usr/bin/env runix\n\n")?;
 		serde_json::to_writer_pretty(&mut dest, self)?;
 		Ok(())
