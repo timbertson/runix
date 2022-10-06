@@ -34,7 +34,7 @@ fn cmd_output(mut cmd: Command) -> Result<String> {
 
 fn run(cmd: &mut Command) -> Result<()> {
 	println!("{:?}", &cmd);
-	let result = cmd.spawn()?.wait()?;
+	let result = cmd.spawn().with_context(||format!("Spawn {:?}", &cmd))?.wait()?;
 	if result.success() {
 		Ok(())
 	} else {

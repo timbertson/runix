@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -eu
+export RUST_BACKTRACE=1
 FLAGS="--nocapture --color=always $*"
 if [ -n "${RUNIX_TESTS:-}" ]; then
 	# inside CI / nix-shell; precompiled tests
