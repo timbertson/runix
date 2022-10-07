@@ -30,7 +30,7 @@ This will fetch runix into `~/.cache/runix`, then install a `runix` symlink into
 
 ## Interactive use:
 
-To run an abitraty derivation, you need to know its name:
+To run an arbitrary derivation, you need to know its name:
 
 **Note**: these examples use a version of `jq` for macOS x86_64, other platforms will have different derivations.
 
