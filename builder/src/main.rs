@@ -111,8 +111,7 @@ impl Target {
 				match self.buildable.name.as_str() {
 
 					"release" => {
-						// TODO
-						// self.dependency("bootstrap").build();
+						self.dependency("bootstrap").build();
 						github::Release::fetch("bootstrap")
 							.replace_asset(&self.dependency(self.tarball_name())._path);
 					},

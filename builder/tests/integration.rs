@@ -137,14 +137,14 @@ fn local_auto_bootstrap() -> Result<()> {
 		.arg(format!("{}/bootstrap", &platform_build))
 	)?;
 	let mut jq_wrapper = build_wrapper("jq");
-	jq_wrapper.set_extension(".bootstrap");
+	jq_wrapper.set_extension("bootstrap");
 
 	test_in_temp_runix(|root| {
 		let mut cmd = Command::new(jq_wrapper);
 		cmd.arg("--help")
 			.env("RUNIX_ROOT", root)
 			.env("LOCAL_BOOTSTRAP", platform_build);
-		let output = cmd_output(cmd)?;
+		let output = cmd_output(cmd).context("wrapper script")?;
 		assert_contains("Note: runix not detected; bootstrapping ...", &output)?;
 		assert_contains("jq - commandline JSON processor", &output)?;
 		Ok(())
