@@ -24,6 +24,10 @@ jobs:
         name: runix
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
+    - name: "Prime nixpkgs"
+      run: |
+        time nix-instantiate --expr --eval 'import (import ./nix/sources.nix {}).nixpkgs {}' >/dev/null
+
     - name: "Basic tests"
       run: |
         nix-shell --attr ci nix/shell.nix --run './test.sh'
