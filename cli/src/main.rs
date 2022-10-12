@@ -269,7 +269,11 @@ SAVING A RUNSCRIPT (WRAPPER)
                        The VALUE is by default a store identity, but can be changed with --expr.
 --expr                 Treat the entrypoint VALUE as a nix expression.
 --multiplatform        Treat the entrypoint VALUE as a nix expression returning an attrset of
-                       `platform: derivation`. Implies `--expr`.
+                       `platform: derivation`. Use this when cross-compiling for multiple
+                       platforms. Implies `--expr`.
+--platforms PLATFORMS  Re-evaluate VALUE for each of the passe-in platforms (comma-separated).
+                       Unlike `--multiplatform`, this is used when you have built the same
+                       expression natively on multiple platforms.
 "#);
 				return Ok(());
 			} else if argstr == "--require" {
@@ -309,7 +313,7 @@ SAVING A RUNSCRIPT (WRAPPER)
 		}
 
 		match entrypoint_arg {
-			None => run_script.add_platform(single_platform, PlatformExec { exec: None, requirements }),
+			None => run_script.add_platform(single_platform, PlatformExec { exec: None, requirements })?,
 			Some((value, relpath)) => {
 				debug!("Computing entrypoint...");
 				let mut add_entrypoint = |platform, derivation: StoreIdentity, relpath| {
@@ -323,13 +327,13 @@ SAVING A RUNSCRIPT (WRAPPER)
 				};
 				if is_multiplatform {
 					for (platform, path) in nix_evaluate::evaluate_multi(&value)? {
-						add_entrypoint(Platform::from_str(&platform)?, StoreIdentity::from_path(&path)?, relpath.clone());
+						add_entrypoint(Platform::from_str(&platform)?, StoreIdentity::from_path(&path)?, relpath.clone())?;
 					}
 				} else if is_expr {
 					let store_path = nix_evaluate::evaluate_single(&value)?;
-					add_entrypoint(single_platform, StoreIdentity::from_path(&store_path)?, relpath);
+					add_entrypoint(single_platform, StoreIdentity::from_path(&store_path)?, relpath)?;
 				} else {
-					add_entrypoint(single_platform, StoreIdentity::new(value)?, relpath);
+					add_entrypoint(single_platform, StoreIdentity::new(value)?, relpath)?;
 				}
 			}
 		};

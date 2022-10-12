@@ -1,4 +1,5 @@
 use anyhow::*;
+use runix_build::run_output;
 use serial_test::serial;
 use std::{process::Command, path::PathBuf, fs, env};
 use itertools::Itertools;
@@ -51,9 +52,19 @@ fn build_wrapper(pname: &str) -> PathBuf {
 
 fn run_wrapper(pname: &str, args: Vec<&str>) -> Result<String> {
 	let path = build_wrapper(pname);
-	let mut cmd = Command::new(path);
-	cmd.args(args);
-	cmd_output(cmd)
+	
+	let mut cmd = Command::new(&path);
+	cmd.args(args.clone());
+	let output = cmd_output(cmd)?;
+
+	// aside: assert that all variants produce the same output
+	for alt_path in vec!(path.with_extension("multiplatform-attrs"), path.with_extension("multiplatform")) {
+		let mut cmd = Command::new(alt_path);
+		cmd.args(args.clone());
+		let alt_output = cmd_output(cmd)?;
+		assert_eq!(output, alt_output)
+	}
+	Ok(output)
 }
 
 fn assert_contains<S: AsRef<str>>(needle: &'static str, data: S) -> Result<()> {
@@ -71,10 +82,12 @@ fn gnupg() -> Result<()> {
 	assert_contains("gpg (GnuPG)", output)
 }
 
+const JQ_HELP_TEXT: &str = "jq - commandline JSON processor";
+
 #[test]
 fn jq() -> Result<()> {
 	let output = run_wrapper("jq", vec!("--help"))?;
-	assert_contains("jq - commandline JSON processor", output)
+	assert_contains(JQ_HELP_TEXT, output)
 }
 
 fn cleanup_runix_root(tmp: &str) -> Result<()> {
@@ -100,9 +113,14 @@ fn test_in_temp_runix<F: FnOnce(&str) -> Result<()>>(f: F) -> Result<()> {
 }
 
 fn current_platform() -> Result<String> {
-	let mut platform_cmd = Command::new("uname");
-	platform_cmd.arg("-m").arg("-s");
-	Ok(String::from_utf8(platform_cmd.output()?.stdout)?.trim().replace(' ', "-"))
+	let stdout = |cmd: &mut Command| {
+		String::from_utf8(cmd.output().unwrap().stdout).unwrap().trim().to_string()
+	};
+
+	Ok(format!("{}-{}",
+		stdout(Command::new("uname").arg("-m")),
+		stdout(Command::new("uname").arg("-s"))
+	))
 }
 
 // ###################################################
@@ -146,7 +164,7 @@ fn local_auto_bootstrap() -> Result<()> {
 			.env("LOCAL_BOOTSTRAP", platform_build);
 		let output = cmd_output(cmd).context("wrapper script")?;
 		assert_contains("Note: runix not detected; bootstrapping ...", &output)?;
-		assert_contains("jq - commandline JSON processor", &output)?;
+		assert_contains(JQ_HELP_TEXT, &output)?;
 		Ok(())
 	})
 }
@@ -154,9 +172,9 @@ fn local_auto_bootstrap() -> Result<()> {
 
 fn all_platforms() -> Vec<&'static str> {
 	vec!(
-		"Linux-x86_64",
-		"Darwin-x86_64",
-		"Darwin-aarch64",
+		"x86_64-Linux",
+		"x86_64-Darwin",
+		"aarch64-Darwin",
 	)
 }
 
@@ -183,15 +201,15 @@ fn crossplatform_file_types() -> Result<()> {
 				continue
 			} else {
 				match platform.split_once('-').unwrap() {
-					(os, arch) => {
-						let exe_type = match os {
-							"Darwin" => "Mach-O",
-							"Linux" => "ELF",
-							_ => todo!(),
-						};
+					(arch, os) => {
 						let arch_name = match arch {
 							"x86_64" => "x86-64",
 							"aarch64" => "arm64",
+							_ => todo!(),
+						};
+						let exe_type = match os {
+							"Darwin" => "Mach-O",
+							"Linux" => "ELF",
 							_ => todo!(),
 						};
 						println!("FILE OUTPUT: {}", line);
@@ -215,7 +233,7 @@ fn linux_bootstrap_in_docker() -> Result<()> {
 		return Ok(())
 	}
 
-	let platform_build = "build/platforms/Linux-x86_64";
+	let platform_build = "build/platforms/x86_64-Linux";
 	run(Command::new("gup")
 		.arg("-u")
 		.arg(format!("../{}/bootstrap", &platform_build))
@@ -232,7 +250,8 @@ fn linux_bootstrap_in_docker() -> Result<()> {
 		.current_dir(&root_dir)
 	)?;
 
-	run(Command::new("docker")
+	let mut run_cmd = Command::new("docker");
+	run_cmd
 		.arg("run")
 		.arg("--rm")
 		.arg("--volume").arg(format!("{}:/app", &root_dir))
@@ -240,8 +259,14 @@ fn linux_bootstrap_in_docker() -> Result<()> {
 		.arg("--env").arg("PATH=/bin:/usr/bin:/usr/local/bin:/home/app/bin")
 		.arg("runix-linux-test")
 		.arg("bash").arg("-euxc")
-		.arg("/app/bootstrap.sh && ~/bin/runix --help")
-	)
+		.arg("/app/bootstrap.sh && ~/bin/runix --help && ~/bin/runix /app/build/wrappers/jq.multiplatform --help");
+	let output = run_output(run_cmd);
+
+	// usage text from runix --help
+	assert_contains("runix RUNSCRIPT [...ARGS]", &output)?;
+
+	assert_contains(JQ_HELP_TEXT, &output)?;
+	Ok(())
 }
 
 #[test]

@@ -15,9 +15,9 @@ impl FromStr for OS {
 	type Err = anyhow::Error;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		match s {
-			"Linux" /* uname -s */ | "linux" /* consts::OS */ => Ok(Self::Linux),
-			"macOS" /* rust name */ | "macos" /* consts::OS */ | "Darwin" /* uname -s */ => Ok(Self::macOS),
+		match s.to_lowercase().as_str() {
+			"linux" => Ok(Self::Linux),
+			"macos" | "darwin" => Ok(Self::macOS),
 			other => Err(anyhow!("Unknown OS: {}", other))
 		}
 	}
@@ -41,7 +41,6 @@ impl Display for OS {
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Arch {
-	i686,
 	x86_64,
 	aarch64,
 }
@@ -51,7 +50,6 @@ impl FromStr for Arch {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
-			"i686" => Ok(Self::i686),
 			"x86_64" => Ok(Self::x86_64),
 			"aarch64" => Ok(Self::aarch64),
 			other => Err(anyhow!("Unknown arch: {}", other))
@@ -63,10 +61,8 @@ impl Arch {
 	pub fn current() -> Result<Self> {
 		if cfg!(target_arch = "x86_64") {
 			Ok(Self::x86_64)
-		} else if cfg!(target_arch = "x86") {
-			Ok(Self::i686)
 		} else if cfg!(target_arch = "aarch64") {
-			Ok(Self::i686)
+			Ok(Self::aarch64)
 		} else {
 			Err(anyhow!("Unknown architecture: {}", std::env::consts::ARCH))
 		}
@@ -76,7 +72,6 @@ impl Arch {
 impl Display for Arch {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.write_str(match self {
-			Self::i686 => "i686",
 			Self::x86_64 => "x86_64",
 			Self::aarch64 => "aarch64",
 		})
@@ -85,22 +80,22 @@ impl Display for Arch {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Platform {
-	os: OS,
 	arch: Arch,
+	os: OS,
 }
 
 impl Platform {
 	pub fn current() -> Result<Self> {
 		Ok(Self {
-			os: OS::current()?,
 			arch: Arch::current()?,
+			os: OS::current()?,
 		})
 	}
 }
 
 impl ToString for Platform {
 	fn to_string(&self) -> String {
-		format!("{}-{}", self.os, self.arch)
+		format!("{}-{}", self.arch, self.os)
 	}
 }
 
@@ -110,13 +105,13 @@ impl FromStr for Platform {
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let inner: Result<Self> = (|| {
 			let mut parts = s.split('-');
-			let os = parts.next();
 			let arch = parts.next();
+			let os = parts.next();
 			let more = parts.next();
-			match (os, arch, more) {
-				(Some(os), Some(arch), None) => Ok(Self {
-					os: OS::from_str(os)?,
+			match (arch, os, more) {
+				(Some(arch), Some(os), None) => Ok(Self {
 					arch: Arch::from_str(arch)?,
+					os: OS::from_str(os)?,
 				}),
 				_ => Err(anyhow!("Invalid platform"))
 			}

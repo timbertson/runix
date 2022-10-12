@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 _() {
 	set -eu
-	PLATFORM="$(uname -m -s | tr ' ' '-')"
+	PLATFORM="$(echo "$(uname -m)-$(uname -s)")"
 	TMP_TAR="/tmp/runix-bootstrap.tgz"
 	TMP_DEST="/tmp/runix-bootstrap"
 	FILENAME="runix-$PLATFORM.tgz"

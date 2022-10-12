@@ -13,7 +13,7 @@ let
 		)
 	];
 
-	fenix-toolchain = pkgs.fenix.stable.withComponents [ "cargo" "rustc" ];
+	fenix-toolchain = pkgs.fenix.stable.withComponents [ "cargo" "rustc" "rust-src" ];
 
 	# in development, we have tools available to build outside nix
 	dev = pkgs.mkShell {

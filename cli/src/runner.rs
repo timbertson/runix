@@ -4,7 +4,7 @@ use crate::paths::{RuntimePaths, self};
 use crate::platform::Platform;
 
 use std::fs;
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map};
 use std::path::Path;
 use std::io::Write;
 use std::env;
@@ -168,8 +168,14 @@ exec "$RUNIX_BIN" "$0" "$@"
 		Ok(())
 	}
 	
-	pub fn add_platform(&mut self, platform: Platform, exec: PlatformExec) {
-		self.platform.insert(platform, exec);
+	pub fn add_platform(&mut self, platform: Platform, exec: PlatformExec) -> Result<()> {
+		match self.platform.entry(platform) {
+			hash_map::Entry::Occupied(_) => Err(anyhow!("Platform added twice to runscript: {}", platform.to_string())),
+			hash_map::Entry::Vacant(entry) => {
+				entry.insert(exec);
+				Ok(())
+			},
+		}
 	}
 
 	pub fn get_platform(&self, platform: Platform) -> Result<&PlatformExec> {

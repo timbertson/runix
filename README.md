@@ -69,17 +69,25 @@ $ runix --save jq --expr --entrypoint '(import <nixpkgs> {}).jq' bin/jq
 
 **Note:** this will not build an expression, only compute its identity. The resulting script will fail unless the derivation has been pushed to the nixos binary cache.
 
-### Multiplatform runscripts:
-
-There are two ways to create a multiplatform runscript.
-
-The first is to make a runscript for each platform, and then use `--merge-into` to merge them into a single file. This is conceptually simple, but logistically complex since it requires you to build & evaluate on each platform.
-
-The second option is to utilize nix's cross compilation support to build all platforms at once (and save a runscript using `--multiplatform`). This is extremely convenient compared to building across different machines, but cross-compilation is generally harder to get things building correctly. Runix itself is built this way, see `./nix/all-platforms.nix` and `./nix/runix.nix` for details.
-
 ### Self-bootstrapping runscripts:
 
 You can pass `--auto-bootstrap` when saving a runscript. This will make a slightly less efficient wrapper script which first installs runix itself if it's not already installed. The upside is of course you don't need to instruct your users to first install runix.
+
+### Multiplatform runscripts:
+
+There are a few ways to create a multiplatform runscript.
+
+#### Cross-compilation:
+
+You can utilize nix's cross compilation support to build all platforms at once (and save a runscript using `--multiplatform`). This is extremely convenient compared to building across different machines, but cross-compilation is generally harder to get things building correctly. Runix itself is built this way, see `./nix/all-platforms.nix` and `./nix/runix.nix` for details.
+
+#### Multiplatform evaluation:
+
+If you don't want to use cross-compilation, you can still build a multiplatform nix expression. See `./build/multiplatform.nix` for an example. The resulting expressions will not be buildable on a single system - you will need to arrange for each platform's expression to be built on that platform (and pushed to a binary cache). But you can still _evaluate_ all expressions locally to produce a multiplatform runscript.
+
+#### Merge runscripts from multiple platforms:
+
+The most manual way to create a cross-platform runscript is to create individual runscripts per-platform (e.g. as part of a multiplatform CI build), then use `--merge-into` to merge them into a single file. This is conceptually simple, but logistically complex since it requires you to build & evaluate on each platform.
 
 ## Distributing arbitrary software:
 
@@ -109,12 +117,6 @@ When using a binary cache, be sure to pass e.g. `--with-cache https://CACHE_NAME
 ### Multi-user:
 
 Runix uses a hardcoded remplacement path of `/tmp/runix`. If you have multi users, that won't work. One day the path may be a hash of `runix#username` for example, which would support concurrent users. It can only be 5 characters long though, since it must replace `store` without changing the length of modified files.
-
-### Multi-platform runscript evaluation:
-
-When building the same expression on different platforms, it'd be good to have some way to evaluate a multiplatform expression (even though the results aren't buildable on a single machine). Does this require overriding builtins.currentSystem?
-
-This is also useful to generate a multiplatform script for software already pulished on the nixos cache.
 
 ### Download improvements:
 

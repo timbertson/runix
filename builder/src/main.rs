@@ -42,17 +42,17 @@ struct Target {
 }
 
 pub fn current_platform() -> String {
-	let mut cmd = Command::new("uname");
-	cmd.arg("-m").arg("-s");
-	let uname = run_output(cmd);
-	uname.replace(' ', "-").to_string()
+	format!("{}-{}",
+		run_output_ref(Command::new("uname").arg("-m")),
+		run_output_ref(Command::new("uname").arg("-s")),
+	)
 }
 
 pub fn all_platforms() -> Vec<&'static str> {
 	vec!(
-		"Linux-x86_64",
-		"Darwin-x86_64",
-		"Darwin-aarch64",
+		"x86_64-Linux",
+		"x86_64-Darwin",
+		"aarch64-Darwin",
 	)
 }
 

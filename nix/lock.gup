@@ -2,11 +2,11 @@
 gup -u ../Cargo.lock
 mkdir "$1"
 
-fetlock -o "$1/Linux-x86_64.nix" -p .. --cargo-platform x86_64-unknown-linux-gnu
-fetlock -o "$1/Darwin-x86_64.nix" -p .. --cargo-platform x86_64-apple-darwin
+fetlock -o "$1/x86_64-Linux.nix" -p .. --cargo-platform x86_64-unknown-linux-gnu
+fetlock -o "$1/x86_64-Darwin.nix" -p .. --cargo-platform x86_64-apple-darwin
 
 # assume aarch64 has the same deps :shrug:
-ln -sfn "./Darwin-x86_64.nix" "$1/Darwin-aarch64.nix"
+ln -sfn "./x86_64-Darwin.nix" "$1/aarch64-Darwin.nix"
 
-platform="$(uname -m -s | tr ' ' '-')"
+platform="$(echo "$(uname -m)-$(uname -s)")"
 ln -sfn "./$platform.nix" "$1/current.nix"

@@ -4,9 +4,9 @@ let
 	_platformArg = platform;
 	sources = import ./sources.nix {};
 	getNixPlatform = p: builtins.getAttr p {
-		"Darwin-aarch64" = "aarch64-apple-darwin";
-		"Darwin-x86_64" = "x86_64-apple-darwin";
-		"Linux-x86_64" = "x86_64-unknown-linux-musl";
+		"aarch64-Darwin" = "aarch64-apple-darwin";
+		"x86_64-Darwin" = "x86_64-apple-darwin";
+		"x86_64-Linux" = "x86_64-unknown-linux-musl";
 	};
 in
 
