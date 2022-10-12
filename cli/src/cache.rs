@@ -175,15 +175,7 @@ impl Client {
 		}
 	}
 
-	fn fetch_narinfo_if_missing<'a>(&'a self, entry: &'a StoreIdentity) -> Result<Option<NarInfo<'a>>> {
-		let dest_path = self.paths.store_path.join(entry.directory());
-		let meta_path = self.paths.meta_path.join(entry.directory());
-		// TODO: locking for concurrent processes
-		if meta_path.exists() && dest_path.exists() {
-			debug!("Cache path already exists: {:?}", dest_path);
-			return Ok(None);
-		}
-
+	pub fn fetch_narinfo<'a>(&'a self, entry: &'a StoreIdentity) -> Result<NarInfo<'a>> {
 		for server in self.servers.iter() {
 			let url = server.narinfo_url(&entry);
 			debug!("fetching {:?}", &url);
@@ -191,7 +183,7 @@ impl Client {
 			debug!("response: {:?}", response);
 			let status = response.status();
 			if status.is_success() {
-				return Ok(Some(NarInfo::parse(&server, &entry, &response.text()?)?))
+				return Ok(NarInfo::parse(&server, &entry, &response.text()?)?)
 			} else {
 				if status == StatusCode::NOT_FOUND {
 					debug!("Not found");
@@ -202,6 +194,18 @@ impl Client {
 			}
 		}
 		Err(anyhow!("Entry {:?} not found on any cache", entry)).context(format!("Servers: {:?}", &self.servers))
+	}
+
+	fn fetch_narinfo_if_missing<'a>(&'a self, entry: &'a StoreIdentity) -> Result<Option<NarInfo<'a>>> {
+		// NOTE: must hold lock to call this
+		let dest_path = self.paths.store_path.join(entry.directory());
+		let meta_path = self.paths.meta_path.join(entry.directory());
+		if meta_path.exists() && dest_path.exists() {
+			debug!("Cache path already exists: {:?}", dest_path);
+			return Ok(None);
+		} else {
+			self.fetch_narinfo(entry).map(Some)
+		}
 	}
 	
 	fn extract(mut response: Response, compression: Compression, extract_to: &PathBuf) -> Result<()> {

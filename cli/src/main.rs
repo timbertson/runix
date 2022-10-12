@@ -63,8 +63,12 @@ pub fn main() -> Result<()> {
 
 		Some("--dump") => {
 			args.next();
-			let entrypoint = mandatory_next_arg("--dump argument", &mut args)?;
-			dump_entrypoint_or_wrapper(entrypoint)
+			dump_runscripts(args)
+		},
+
+		Some("--validate") => {
+			args.next();
+			validate_runscripts(args)
 		},
 
 		// main CLI
@@ -154,7 +158,7 @@ fn self_install(script_path: String) -> Result<()> {
 	// Script looks valid. Make sure there's a symlink on $PATH, then execute it to finish install
 	install_symlink_to_current_on_path(&paths)?;
 	let args = vec!("--make-current".to_owned(), store_identity.directory().to_owned());
-	script.exec(platform, args.into_iter())
+	script.exec(&paths, platform, args.into_iter())
 }
 
 fn merge_into<A: Iterator<Item=String>>(dest: String, components: A) -> Result<()> {
@@ -175,29 +179,19 @@ fn is_wrapper_script(arg: &str) -> bool {
 	arg.contains('/') && p.exists()
 }
 
-fn dump_entrypoint_or_wrapper(path: String) -> Result<()> {
-	let platform_exec = if is_wrapper_script(&path) {
-		// invoked via shebang
-		RunScript::load(&path)?.get_platform(Platform::current()?)?.to_owned()
-	} else {
-		// expect a single identity
-		PlatformExec {
-			exec: None,
-			requirements: vec!(StoreIdentity::new(path)?),
-		}
-	};
-	
+fn dump_runscripts<A: Iterator<Item=String>>(script_paths: A) -> Result<()> {
 	let paths = paths::RuntimePaths::from_env()?;
-	let roots = platform_exec.cache_roots(
-		&cache::Client {
-			paths: paths.clone(),
-			servers: vec!(RunScript::default_cache()),
-		}
-	)?;
+	for script_path in script_paths {
+		println!("{}", &script_path);
+		let runscript = RunScript::load(script_path)?;
+		let platform_exec = runscript.get_platform(Platform::current()?)?;
+		let client = runscript.client(paths.clone());
+		let roots = platform_exec.cache_roots(&client)?;
 
-	for root in roots {
-		let mut visited = HashSet::new();
-		dump_visit_entrypoint(&paths, &mut visited, 0, root)?;
+		for root in roots {
+			let mut visited = HashSet::new();
+			dump_visit_entrypoint(&paths, &mut visited, 0, root)?;
+		}
 	}
 	Ok(())
 }
@@ -227,6 +221,22 @@ fn dump_visit_entrypoint(
 	Ok(())
 }
 
+fn validate_runscripts<A: Iterator<Item=String>>(script_paths: A) -> Result<()> {
+	let paths = paths::RuntimePaths::from_env()?;
+	for script_path in script_paths {
+		println!("{}", &script_path);
+		let runscript = RunScript::load(&script_path)?;
+		let client = runscript.client(paths.clone());
+		for (_, platform_exec) in runscript.platforms() {
+			for root in platform_exec.roots() {
+				client.fetch_narinfo(root)?;
+				println!("OK: {}", root.directory());
+			}
+		}
+	}
+	Ok(())
+}
+
 fn default_action<A: Iterator<Item=String>>(mut args: Peekable<A>) -> Result<()> {
 	let first_arg = mandatory_arg("at least one", args.peek())?;
 	let mut single_platform = Platform::current()?;
@@ -250,17 +260,21 @@ fn default_action<A: Iterator<Item=String>>(mut args: Peekable<A>) -> Result<()>
 		while let Some(argstr) = args.peek() {
 			if argstr == "--help" {
 				println!(r#"
-USAGE:
+RUNNING SOFTWARE:
   runix RUNSCRIPT [...ARGS]
   runix [OPTIONS] STORE_IDENTITY [...CMD]
+
+AUTHORING RUNSCRIPTS:
+  runix --save PATH [OPTIONS]
+  runix --validate PATH
+  runix --dump PATH
   runix --merge-into DEST [...RUNSCRIPTS]
 
 OPTIONS:
 --require IDENTITY     Add this store name as a requirement.
 --with-cache URI       Add this server to the list of caches used.
 
-SAVING A RUNSCRIPT (WRAPPER)
---save PATH            Save a runscript, instead of executing directly.
+OPTIONS for --save:
 --auto-bootstrap       Make a runscript self-bootstrapping
 
 --entrypoint VALUE RELPATH
@@ -348,6 +362,9 @@ SAVING A RUNSCRIPT (WRAPPER)
 			}
 			run_script.write_to(&save_to, script_type)
 		},
-		None => run_script.exec(single_platform, args),
+		None => {
+			let paths = paths::RuntimePaths::from_env()?;
+			run_script.exec(&paths, single_platform, args)
+		},
 	}
 }

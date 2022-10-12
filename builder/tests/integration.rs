@@ -4,18 +4,19 @@ use serial_test::serial;
 use std::{process::Command, path::PathBuf, fs, env};
 use itertools::Itertools;
 
-fn run_exe(pname: &str, args: Vec<&str>) -> Result<String> {
+fn runix_cmd() -> Result<Command> {
 	let runix_exe = "../build/runix";
 	assert!(Command::new("gup").arg("-u").arg(runix_exe).spawn()?.wait()?.success());
+	Ok(Command::new(runix_exe))
+}
 
+fn run_store_path(pname: &str, args: Vec<&str>) -> Result<String> {
 	let mut path = PathBuf::from("../build/store-paths");
 	path.push(format!("{}.drv", pname));
 	assert!(Command::new("gup").arg("-u").arg(&path).spawn()?.wait()?.success());
 	let store_path = fs::read_to_string(path)?;
 
-	run(Command::new(runix_exe).arg("--dump").arg(store_path.trim()))?;
-
-	let mut cmd = Command::new(runix_exe);
+	let mut cmd = runix_cmd()?;
 	cmd.arg("--require").arg(store_path.trim()).args(args);
 	cmd_output(cmd)
 }
@@ -78,7 +79,7 @@ fn assert_contains<S: AsRef<str>>(needle: &'static str, data: S) -> Result<()> {
 
 #[test]
 fn gnupg() -> Result<()> {
-	let output = run_exe("gnupg", vec!("gpg", "--help"))?;
+	let output = run_store_path("gnupg", vec!("gpg", "--help"))?;
 	assert_contains("gpg (GnuPG)", output)
 }
 
@@ -88,6 +89,16 @@ const JQ_HELP_TEXT: &str = "jq - commandline JSON processor";
 fn jq() -> Result<()> {
 	let output = run_wrapper("jq", vec!("--help"))?;
 	assert_contains(JQ_HELP_TEXT, output)
+}
+
+#[test]
+fn validate_jq_multiplatform() -> Result<()> {
+	let mut jq = build_wrapper("jq");
+	jq.set_extension("multiplatform");
+	let mut cmd = runix_cmd()?;
+	cmd.arg("--validate").arg(jq);
+	assert_eq!(Some(0), cmd.status()?.code());
+	Ok(())
 }
 
 fn cleanup_runix_root(tmp: &str) -> Result<()> {

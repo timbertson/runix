@@ -47,11 +47,14 @@ impl PlatformExec {
 		Ok(())
 	}
 
-	pub fn cache_roots<'a>(&'a self, client: &cache::Client) -> Result<Vec<&'a StoreIdentity>> {
-		let roots: Vec<&StoreIdentity> = self.requirements.iter()
+	pub fn roots<'a>(&'a self) -> Vec<&'a StoreIdentity> {
+		self.requirements.iter()
 			.chain(self.exec.iter().map(|x| &x.derivation))
-			.collect();
+			.collect()
+	}
 
+	pub fn cache_roots<'a>(&'a self, client: &cache::Client) -> Result<Vec<&'a StoreIdentity>> {
+		let roots = self.roots();
 		for req in roots.iter() {
 			debug!("Caching: {:?}", req);
 			client.cache(req)?;
@@ -189,16 +192,21 @@ exec "$RUNIX_BIN" "$0" "$@"
 	fn platform_not_found(platform: Platform) -> Error {
 		anyhow!("No implementations provided for platform [{}]", platform.to_string())
 	}
+	
+	pub fn platforms(&self) -> impl Iterator<Item=(&Platform, &PlatformExec)> {
+		self.platform.iter()
+	}
 
-	pub fn exec<'a, I: Iterator<Item=String>>(self, platform: Platform, args: I) -> Result<()> {
-		let paths = RuntimePaths::from_env()?;
-		let Self { caches, platform: platforms } = self;
-		let client = cache::Client {
-			servers: caches,
-			paths: paths.clone(),
-		};
+	pub fn client(&self, paths: RuntimePaths) -> cache::Client {
+		cache::Client {
+			paths,
+			servers: self.caches.clone(),
+		}
+	}
 
-		let platform_exec = Self::get_platform_from(platform, &platforms)?;
+	pub fn exec<'a, I: Iterator<Item=String>>(self, paths: &RuntimePaths, platform: Platform, args: I) -> Result<()> {
+		let client = self.client(paths.clone());
+		let platform_exec = Self::get_platform_from(platform, &self.platform)?;
 		platform_exec.exec(&client, &paths, args)
 	}
 
