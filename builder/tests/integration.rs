@@ -1,7 +1,7 @@
 use anyhow::*;
 use runix_build::run_output;
 use serial_test::serial;
-use std::{process::Command, path::PathBuf, fs, env};
+use std::{process::{Command, Stdio}, path::PathBuf, fs, env};
 use itertools::Itertools;
 
 fn runix_cmd() -> Result<Command> {
@@ -58,12 +58,12 @@ fn run_wrapper(pname: &str, args: Vec<&str>) -> Result<String> {
 	cmd.args(args.clone());
 	let output = cmd_output(cmd)?;
 
-	// aside: assert that all variants produce the same output
+	// aside: assert that all variants also succeed
 	for alt_path in vec!(path.with_extension("multiplatform-attrs"), path.with_extension("multiplatform")) {
 		let mut cmd = Command::new(alt_path);
 		cmd.args(args.clone());
-		let alt_output = cmd_output(cmd)?;
-		assert_eq!(output, alt_output)
+		cmd.stdout(Stdio::null());
+		assert_eq!(Some(0), cmd.status()?.code());
 	}
 	Ok(output)
 }

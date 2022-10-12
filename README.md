@@ -120,8 +120,8 @@ Runix uses a hardcoded remplacement path of `/tmp/runix`. If you have multi user
 
 ### Download improvements:
 
-Make downloads more efficient and add retries for transient HTTP / network errors.
+Support parallel downloads and add retries for transient HTTP / network errors.
 
-## Self-update:
+### Self-update:
 
  - provide a builtin way to update from the current bootstrap release's runscript
