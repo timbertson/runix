@@ -55,12 +55,14 @@ impl ToString for Server {
 #[derive(Copy, Clone, Debug)]
 pub enum Compression {
 	XZ,
+	Zstd,
 }
 
 impl Compression {
 	fn parse(s: &str) -> Result<Self> {
 		match s {
 			"xz" => Ok(Self::XZ),
+			"zstd" => Ok(Self::Zstd),
 			other => Err(anyhow!("Unknown compression type: {}", other)),
 		}
 	}
@@ -211,8 +213,8 @@ impl Client {
 	fn extract(mut response: Response, compression: Compression, extract_to: &PathBuf) -> Result<()> {
 		let extractors_root = option_env!("RUNIX_EXTRACTORS_BIN");
 		let decompress_bin = match compression {
-			// TODO should this be a bundled dependency?
 			Compression::XZ => "unxz",
+			Compression::Zstd => "unzstd",
 		};
 
 		let mut decompress_cmd = Command::new(match extractors_root {

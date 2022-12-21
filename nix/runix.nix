@@ -31,16 +31,21 @@ let
 		# extractors just contains exact binaries needed, to reduce
 		# closure size by avoiding e.g. bash dependency
 		extractors =
-			let xz = self.xz; in
+			let
+				xz = self.xz.bin;
+				zstd = self.zstd.bin;
+			in
 			pkgsBuildBuild.stdenv.mkDerivation {
 				pname = "runix-extract";
 				version = "1";
 				buildCommand = ''
 					mkdir -p "$out/bin"
-					cp -a "${xz.bin}/bin/xz" "$out/bin/unxz"
+					cp -a "${xz}/bin/xz" "$out/bin/unxz"
+					cp -a "${zstd}/bin/zstd" "$out/bin/unzstd"
 					chmod -R +x $out
 					${removeReferencesTo}/bin/remove-references-to \
-						-t ${xz.bin} \
+						-t ${xz} \
+						-t ${zstd} \
 						$out/bin/*
 				'';
 			};
