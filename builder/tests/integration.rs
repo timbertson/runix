@@ -17,6 +17,7 @@ fn run_store_path(pname: &str, args: Vec<&str>) -> Result<String> {
 	let store_path = fs::read_to_string(path)?;
 
 	let mut cmd = runix_cmd()?;
+	cmd.env("RUNIX_CHECK", "1");
 	cmd.arg("--require").arg(store_path.trim()).args(args);
 	cmd_output(cmd)
 }

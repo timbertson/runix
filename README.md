@@ -95,6 +95,9 @@ If your derivation is not already on the public nixos cache, you will need to pu
 
 When using a binary cache, be sure to pass e.g. `--with-cache https://CACHE_NAME.cachix.org` when generating a runscript so that runix will be able to find the published artifacts.
 
+## Fixing cache issues:
+
+You shouldn't need to, but if you need to dig into the cache and remove entries manually you should set `$RUNIX_CHECK=1` afterwards. By default runix doesn't check the dependencies of an existing cache entry, since it never writes a store path without first writing dependencies. With this environment variable set runix will traverse all dependencies and make sure they exist, even dependencies behind already-cached store paths.
 
 ---
 

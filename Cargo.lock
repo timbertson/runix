@@ -699,6 +699,7 @@ dependencies = [
  "fd-lock",
  "filetime",
  "itertools",
+ "lazy_static",
  "log",
  "memmap2",
  "nix-nar",

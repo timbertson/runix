@@ -15,6 +15,7 @@ serde = { version = "1.0", features = ["derive"] }
 nix-nar = "0.2"
 filetime = "0.2"
 fd-lock = "3"
+lazy_static = "1"
 
 [dependencies.reqwest]
 default-features = false

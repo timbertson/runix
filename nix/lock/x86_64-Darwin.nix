@@ -16,7 +16,7 @@ in
         ("runix-0.1.0")
         ("runix-build-0.1.0")
       ];
-      src = (final.pathSrc ../.);
+      src = (final.pathSrc ../../.);
     };
     "aho-corasick-0.7.18" = {
       pname = "aho-corasick";
@@ -1292,6 +1292,7 @@ in
         ("fd-lock-3.0.6")
         ("filetime-0.2.17")
         ("itertools-0.10.3")
+        ("lazy_static-1.4.0")
         ("log-0.4.17")
         ("memmap2-0.5.7")
         ("nix-nar-0.2.0")

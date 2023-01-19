@@ -4,6 +4,7 @@ use anyhow::*;
 use log::*;
 use reqwest::StatusCode;
 use reqwest::blocking::Response;
+use lazy_static::lazy_static;
 use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf, str::FromStr};
 
 use crate::{paths::RuntimePaths, store::StoreMeta};
@@ -150,6 +151,10 @@ impl Default for ClientState {
 	}
 }
 
+lazy_static! {
+	static ref CHECK_ALL_PATHS: bool = std::env::var_os("RUNIX_CHECK").as_deref() == Some(std::ffi::OsStr::new("1"));
+}
+
 impl Client {
 	pub fn cache(&self, entry: &StoreIdentity) -> Result<()> {
 		let mut state = ClientState::default();
@@ -172,6 +177,13 @@ impl Client {
 				}
 				self.download_and_extract(&narinfo).with_context(|| format!("Caching {:?}", entry))
 			} else {
+				if *CHECK_ALL_PATHS {
+					debug!("Checking cached entry {}", &entry);
+					let meta = StoreMeta::load(&self.paths, entry)?;
+					for dep in meta.references() {
+						self.cache_with_state(state, dep)?;
+					}
+				}
 				StoreMeta::touch(&self.paths, entry)
 			}
 		}
