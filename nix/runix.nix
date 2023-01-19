@@ -33,7 +33,8 @@ let
 		extractors =
 			let
 				xz = self.xz.bin;
-				zstd = self.zstd.bin;
+				# TODO remove ./zstd.nix when https://github.com/NixOS/nixpkgs/pull/211515 is merged and stable
+				zstd = (super.pkgs.callPackage ./zstd.nix {}).bin;
 			in
 			pkgsBuildBuild.stdenv.mkDerivation {
 				pname = "runix-extract";
