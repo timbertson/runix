@@ -79,6 +79,7 @@ fn assert_contains<S: AsRef<str>>(needle: &'static str, data: S) -> Result<()> {
 }
 
 #[test]
+#[serial]
 fn gnupg() -> Result<()> {
 	let output = run_store_path("gnupg", vec!("gpg", "--help"))?;
 	assert_contains("gpg (GnuPG)", output)
@@ -87,12 +88,14 @@ fn gnupg() -> Result<()> {
 const JQ_HELP_TEXT: &str = "jq - commandline JSON processor";
 
 #[test]
+#[serial]
 fn jq() -> Result<()> {
 	let output = run_wrapper("jq", vec!("--help"))?;
 	assert_contains(JQ_HELP_TEXT, output)
 }
 
 #[test]
+#[serial]
 fn validate_jq_multiplatform() -> Result<()> {
 	let mut jq = build_wrapper("jq");
 	jq.set_extension("multiplatform");
@@ -236,6 +239,7 @@ fn crossplatform_file_types() -> Result<()> {
 }
 
 #[test]
+#[serial]
 #[ignore]
 fn linux_bootstrap_in_docker() -> Result<()> {
 	// This checks linux on darwin. There's no way to check darwin on linux

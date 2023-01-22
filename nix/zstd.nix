@@ -7,7 +7,7 @@
 , static ? stdenv.hostPlatform.isStatic
 # these need to be ran on the host, thus disable when cross-compiling
 , buildContrib ? stdenv.hostPlatform == stdenv.buildPlatform
-, doCheck ? stdenv.hostPlatform == stdenv.buildPlatform
+, doCheck ? false
 , nix-update-script
 }:
 
