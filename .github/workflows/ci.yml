@@ -8,6 +8,8 @@ name: "Build and test"
 jobs:
   ci:
     runs-on: macos-latest
+    env:
+      USE_SYSTEM_CACHIX: "1"
     steps:
     - uses: actions/checkout@v2
       with:
@@ -19,7 +21,7 @@ jobs:
         extra_nix_config: |
           max-jobs = 6
 
-    - uses: cachix/cachix-action@v10
+    - uses: cachix/cachix-action@v12
       with:
         name: runix
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
