@@ -51,7 +51,12 @@ impl FromStr for Arch {
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
 			"x86_64" => Ok(Self::x86_64),
+			
+			// uname reports `arm64`, so that's what we use for bootstrapping and
+			// CLI. But we also support `aarch64` since that's what we get from
+			// `drv.system` of a nix build.
 			"arm64" => Ok(Self::arm64),
+			"aarch64" => Ok(Self::arm64),
 			other => Err(anyhow!("Unknown arch: {}", other))
 		}
 	}

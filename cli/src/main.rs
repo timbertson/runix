@@ -285,7 +285,7 @@ OPTIONS for --save:
 --multiplatform        Treat the entrypoint VALUE as a nix expression returning an attrset of
                        `platform: derivation`. Use this when cross-compiling for multiple
                        platforms. Implies `--expr`.
---platforms PLATFORMS  Re-evaluate VALUE for each of the passe-in platforms (comma-separated).
+--platforms PLATFORMS  Re-evaluate VALUE for each of the passed-in platforms (comma-separated).
                        Unlike `--multiplatform`, this is used when you have built the same
                        expression natively on multiple platforms.
 "#);
