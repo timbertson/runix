@@ -219,7 +219,7 @@ fn crossplatform_file_types() -> Result<()> {
 					(arch, os) => {
 						let arch_name = match arch {
 							"x86_64" => "x86-64",
-							"aarch64" => "arm64",
+							"arm64" => "arm64",
 							_ => todo!(),
 						};
 						let exe_type = match os {

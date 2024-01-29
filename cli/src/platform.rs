@@ -42,7 +42,7 @@ impl Display for OS {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Arch {
 	x86_64,
-	aarch64,
+	arm64,
 }
 
 impl FromStr for Arch {
@@ -51,7 +51,7 @@ impl FromStr for Arch {
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
 			"x86_64" => Ok(Self::x86_64),
-			"aarch64" => Ok(Self::aarch64),
+			"arm64" => Ok(Self::arm64),
 			other => Err(anyhow!("Unknown arch: {}", other))
 		}
 	}
@@ -62,7 +62,7 @@ impl Arch {
 		if cfg!(target_arch = "x86_64") {
 			Ok(Self::x86_64)
 		} else if cfg!(target_arch = "aarch64") {
-			Ok(Self::aarch64)
+			Ok(Self::arm64)
 		} else {
 			Err(anyhow!("Unknown architecture: {}", std::env::consts::ARCH))
 		}
@@ -73,7 +73,7 @@ impl Display for Arch {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.write_str(match self {
 			Self::x86_64 => "x86_64",
-			Self::aarch64 => "aarch64",
+			Self::arm64 => "arm64",
 		})
 	}
 }

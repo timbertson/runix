@@ -5,5 +5,5 @@ listToAttrs (map (platform: {
 }) [
 	"x86_64-Darwin"
 	"x86_64-Linux"
-	"aarch64-Darwin"
+	"arm64-Darwin"
 ])

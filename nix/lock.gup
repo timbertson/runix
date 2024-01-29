@@ -5,8 +5,8 @@ mkdir "$1"
 fetlock -o "$1/x86_64-Linux.nix" -p .. --cargo-platform x86_64-unknown-linux-gnu
 fetlock -o "$1/x86_64-Darwin.nix" -p .. --cargo-platform x86_64-apple-darwin
 
-# assume aarch64 has the same deps :shrug:
-ln -sfn "./x86_64-Darwin.nix" "$1/aarch64-Darwin.nix"
+# assume arm64 has the same deps :shrug:
+ln -sfn "./x86_64-Darwin.nix" "$1/arm64-Darwin.nix"
 
 platform="$(echo "$(uname -m)-$(uname -s)")"
 ln -sfn "./$platform.nix" "$1/current.nix"
