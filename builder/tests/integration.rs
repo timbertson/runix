@@ -189,7 +189,7 @@ fn all_platforms() -> Vec<&'static str> {
 	vec!(
 		"x86_64-Linux",
 		"x86_64-Darwin",
-		"aarch64-Darwin",
+		"arm64-Darwin",
 	)
 }
 

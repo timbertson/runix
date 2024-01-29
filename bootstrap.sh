@@ -6,6 +6,7 @@ _() {
 	TMP_DEST="/tmp/runix-bootstrap"
 	FILENAME="runix-$PLATFORM.tgz"
 	if [ -n "${LOCAL_BOOTSTRAP:-}" ]; then
+		echo >&2 "[runix-bootstrap] Using local bootstrap archive: $LOCAL_BOOTSTRAP/$FILENAME"
 		cp "$LOCAL_BOOTSTRAP/$FILENAME" "$TMP_TAR"
 	else
 		echo >&2 "[runix-bootstrap] Downloading ..."
