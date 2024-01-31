@@ -9,7 +9,7 @@ _() {
 		echo >&2 "[runix-bootstrap] Using local bootstrap archive: $LOCAL_BOOTSTRAP/$FILENAME"
 		cp "$LOCAL_BOOTSTRAP/$FILENAME" "$TMP_TAR"
 	else
-		echo >&2 "[runix-bootstrap] Downloading ..."
+		echo >&2 "[runix-bootstrap] Downloading ${FILENAME} ..."
 		curl -o "$TMP_TAR" -sSL "https://github.com/timbertson/runix/releases/download/bootstrap/$FILENAME"
 	fi
 
