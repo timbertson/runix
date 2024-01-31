@@ -145,7 +145,6 @@ let
 	in {
 		inherit fenix-rust;
 		rustc = self.fenix-rust;
-		cargo = self.fenix-rust;
 		runix-extractors = extractors;
 		runix = {
 			inherit makeSelection selection root commonPkgOverrides isDarwin;

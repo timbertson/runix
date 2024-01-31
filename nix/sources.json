@@ -5,10 +5,10 @@
         "homepage": "",
         "owner": "nix-community",
         "repo": "fenix",
-        "rev": "dca822b67ddf0af52f9b63feaeefc1668c8635c0",
-        "sha256": "07qnvv42h6ri1vv4rczc4ys2nll4n0l13x19jrgxn065hip3nfiy",
+        "rev": "2fccc3f4ab4f1853e56f858a969b85f48005a2a8",
+        "sha256": "0y0v0lzb4hxv4p0m34mqcqik4qwn7bz94kcaf8ddnmnz22d7asm0",
         "type": "tarball",
-        "url": "https://github.com/nix-community/fenix/archive/dca822b67ddf0af52f9b63feaeefc1668c8635c0.tar.gz",
+        "url": "https://github.com/nix-community/fenix/archive/2fccc3f4ab4f1853e56f858a969b85f48005a2a8.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "fetlock": {
@@ -23,28 +23,28 @@
         "url": "https://github.com/timbertson/fetlock/archive/a66cc86ce240575ddba6fbb70621bdec167361d9.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
-    "gup": {
-        "branch": "master",
-        "description": "A better make, inspired by djb's redo.",
-        "homepage": null,
+    "nixpkgs": {
+        "branch": "22-11-musl",
+        "description": "Nix Packages collection",
+        "homepage": "",
         "owner": "timbertson",
-        "repo": "gup",
-        "rev": "version-0.8.3",
-        "sha256": "0yprgqwrjq8kvcgkwy80h5497f4b6zgl1pa8nh8zcjv2xhnnn0gs",
+        "repo": "nixpkgs",
+        "rev": "6a2d1048c38fa37c257dc6fbebaf8af2cc8721a9",
+        "sha256": "15m7i0dvg153lw5hl1614n0rcrbdmq7kjdyc38hpzszaw1m4xw0l",
         "type": "tarball",
-        "url": "https://github.com/timbertson/gup/archive/version-0.8.3.tar.gz",
+        "url": "https://github.com/timbertson/nixpkgs/archive/6a2d1048c38fa37c257dc6fbebaf8af2cc8721a9.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
-    "nixpkgs": {
-        "branch": "release-22.05",
+    "nixpkgs-upstrem-tmp-rename": {
+        "branch": "release-23.11",
         "description": "Nix Packages collection",
         "homepage": "",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "e9bd3d0616382fdf7a3b4d1416935c5dbdf366f8",
-        "sha256": "05gw1xfzm2pi2pqak0g3dj8cmqz8i9aiwk3gy1bil0r3if1pgq1a",
+        "rev": "0ea23c2c3792b92fe97535ef62d9a911eac9f250",
+        "sha256": "1zi8hf8ljzl911z42lxmg01il619q95vhad4j6ngygk9qf33mfj0",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/e9bd3d0616382fdf7a3b4d1416935c5dbdf366f8.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/0ea23c2c3792b92fe97535ef62d9a911eac9f250.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

@@ -5,13 +5,8 @@ let
 			(import "${sources.fenix}/overlay.nix")
 		];
 	};
-	cachixList = if (builtins.getEnv "USE_SYSTEM_CACHIX" == 1) then [ pkgs.cachix ] else [];
-	commonInputs = cachixList ++ (with pkgs; [
-		# gup # TODO: use upstream when v0.8.2 is released
-		(let base = callPackage "${sources.gup}/nix/gup-python.nix" {};
-			in base.overrideAttrs (_: { src = sources.gup; })
-		)
-	]);
+	cachixList = if (builtins.getEnv "USE_SYSTEM_CACHIX" == "1") then [] else [ pkgs.cachix ];
+	commonInputs = cachixList ++ (with pkgs; [ gup ]);
 
 	fenix-toolchain = pkgs.fenix.stable.withComponents [ "cargo" "rustc" "rust-src" ];
 
