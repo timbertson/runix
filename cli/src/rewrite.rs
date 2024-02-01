@@ -3,6 +3,7 @@ use log::*;
 use memmap2::MmapMut;
 use std::{path::Path, fs};
 use walkdir::WalkDir;
+use std::process::Command;
 use crate::{paths::{RewritePaths, self}, store::StoreIdentity};
 
 fn windows_mut_each<T>(v: &mut [T], n: usize, mut f: impl FnMut(&mut [T])) {
@@ -59,6 +60,44 @@ impl RewriteReferences {
 	}
 }
 
+// MacOS will kill processes if their executables (and dynamic libs) aren't signed.
+// Thankfully we can use an ad-hoc signature which makes the exe valid, without
+// needing an actual certificate etc.
+#[cfg(not(target_os = "macos"))]
+fn fix_rewritten_file(stat: &fs::Metadata, path: &Path) -> Result<()> { Ok(()) }
+#[cfg(target_os = "macos")]
+fn fix_rewritten_file(stat: &fs::Metadata, path: &Path) -> Result<()> {
+	// need to cover all binaries and libraries.
+	// Other "executable" files like bash scripts will
+	// hit this code path, but codesign seems to happily
+	// skip those :shrug:
+
+	if stat.is_file() && paths::util::is_executable(stat.permissions()) {
+		let mut cmd = Command::new("codesign");
+		cmd
+			.arg("-s").arg("-") // ad-hoc signature
+			.arg("-f") // replace existing signature
+			.arg(path);
+		debug!("Running {:?}", &cmd);
+		let output = cmd.output().with_context(||format!("Running {:?}", &cmd))?;
+		if output.status.success() {
+			Ok(())
+		} else {
+			let stderr = String::from_utf8(output.stderr)?;
+			let stdout = String::from_utf8(output.stdout)?;
+			if !stderr.trim().is_empty() {
+				error!("{}", stderr.trim());
+			}
+			if !stdout.trim().is_empty() {
+				info!("{}", stdout.trim());
+			}
+			Err(anyhow!("Command failed: {:?}", &cmd))
+		}
+	} else {
+		Ok(())
+	}
+}
+
 // TODO support for some kind of opt-out via .nix-support/runix?
 pub fn rewrite_all_recursively<'a, P: AsRef<Path>, R: IntoIterator<Item=&'a StoreIdentity>>(
 	src_path: &P,
@@ -75,13 +114,17 @@ pub fn rewrite_all_recursively<'a, P: AsRef<Path>, R: IntoIterator<Item=&'a Stor
 		let stat = entry.metadata()?;
 		if stat.is_file() {
 			paths::util::ensure_writeable(path)?;
-			let file = fs::OpenOptions::new()
-				.read(true)
-				.write(true)
-				.open(&path)?;
-			let mut mmap = unsafe { MmapMut::map_mut(&file)? };
-			let count = rewrite.replace_all(&mut mmap);
+			let count = {
+				// locally scoped so file / mmap are closed immediately
+				let file = fs::OpenOptions::new()
+					.read(true)
+					.write(true)
+					.open(&path)?;
+				let mut mmap = unsafe { MmapMut::map_mut(&file)? };
+				rewrite.replace_all(&mut mmap)
+			};
 			if count > 0 {
+				fix_rewritten_file(&stat, &path)?;
 				debug!("Replaced {} items in {:?}", count, path);
 			}
 		}

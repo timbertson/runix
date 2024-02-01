@@ -155,6 +155,8 @@ impl StoreMeta {
 #[derive(Clone, Debug)]
 pub struct StoreMetaFull {
 	meta: StoreMeta,
+
+	#[allow(dead_code)] // future use
 	used_timestamp: FileTime,
 }
 
