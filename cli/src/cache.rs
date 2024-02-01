@@ -8,8 +8,8 @@ use lazy_static::lazy_static;
 use std::{fs, process::{Command, Stdio}, collections::HashSet, path::PathBuf, str::FromStr};
 
 use crate::{paths::RuntimePaths, store::StoreMeta};
-use crate::rewrite;
-use crate::store::StoreIdentity;
+use crate::{rewrite, store};
+use crate::store::{MetaError, StoreIdentity};
 use crate::serde_from_string;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -214,11 +214,24 @@ impl Client {
 		// NOTE: must hold lock to call this
 		let dest_path = self.paths.store_path.join(entry.directory());
 		let meta_path = self.paths.meta_path.join(entry.directory());
-		if meta_path.exists() && dest_path.exists() {
-			debug!("Cache path already exists: {:?}", dest_path);
-			return Ok(None);
+		let meta = if meta_path.exists() && dest_path.exists() {
+			match StoreMeta::load(&self.paths, &entry) {
+				Result::Ok(meta) => Ok(Some(meta)),
+				Err(MetaError::UnsupportedVersion) => {
+					fs::remove_file(&meta_path)?;
+					Ok(None)
+				},
+				Err(MetaError::LoadError(e)) => {
+					Err(e)
+				},
+			}?
 		} else {
-			self.fetch_narinfo(entry).map(Some)
+			None
+		};
+		
+		match meta {
+			Some(_) => Ok(None),
+			None => self.fetch_narinfo(entry).map(Some),
 		}
 	}
 	
@@ -282,7 +295,7 @@ impl Client {
 		rewrite::rewrite_all_recursively(&dest, &self.paths.rewrite, &nar_info.references)?;
 		
 		// create the meta file, which signifies the validity of the store path
-		StoreMeta::write(&self.paths, nar_info)?;
+		StoreMeta::write(&self.paths, nar_info, store::StoreEntryVersion::Latest)?;
 
 		info!("Fetched {}", nar_info.identity.display_name());
 		Ok(())

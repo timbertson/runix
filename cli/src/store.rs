@@ -1,4 +1,5 @@
 use anyhow::*;
+use log::*;
 use std::path::PathBuf;
 use std::{fs, str::FromStr, fmt::Display};
 use serde::{Serialize, Deserialize};
@@ -6,6 +7,40 @@ use filetime::{set_file_mtime, FileTime};
 
 use crate::{serde_from_string, cache::NarInfo};
 use crate::paths::*;
+
+const LATEST_VERSION: i32 = 1;
+// v0: original runix release
+// v1: codesign on all rewritten executable files
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(from = "i32", into = "i32")]
+pub enum StoreEntryVersion {
+	Latest,
+	Historical(i32),
+}
+
+impl StoreEntryVersion {
+	fn v0() -> Self { Self::Historical(0) }
+}
+
+impl From<i32> for StoreEntryVersion {
+	fn from(value: i32) -> Self {
+		if value == LATEST_VERSION {
+			Self::Latest
+		} else {
+			Self::Historical(value)
+		}
+	}
+}
+
+impl Into<i32> for StoreEntryVersion {
+	fn into(self) -> i32 {
+		match self {
+			Self::Latest => LATEST_VERSION,
+			Self::Historical(i) => i,
+		}
+	}
+}
 
 pub struct StoreIdentityNameDisplay<'a>(&'a StoreIdentity);
 impl<'a> Display for StoreIdentityNameDisplay<'a> {
@@ -101,6 +136,32 @@ impl Display for StoreIdentity {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StoreMeta {
 	pub references: Vec<StoreIdentity>,
+	
+	#[serde(default="StoreEntryVersion::v0")]
+	pub version: StoreEntryVersion,
+}
+
+#[derive(Debug)]
+pub enum MetaError {
+	UnsupportedVersion,
+	LoadError(anyhow::Error),
+}
+
+impl std::fmt::Display for MetaError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::UnsupportedVersion => f.write_str("Unsupported store entry version"),
+			Self::LoadError(e) => e.fmt(f),
+		}
+	}
+}
+
+impl std::error::Error for MetaError {}
+
+impl From<Error> for MetaError {
+	fn from(err: Error) -> Self {
+		Self::LoadError(err)
+	}
 }
 
 impl StoreMeta {
@@ -108,7 +169,7 @@ impl StoreMeta {
 		paths.meta_path.join(&identity.directory)
 	}
 
-	pub fn write(paths: &RuntimePaths, nar_info: &NarInfo<'_>) -> Result<()> {
+	pub fn write(paths: &RuntimePaths, nar_info: &NarInfo<'_>, version: StoreEntryVersion) -> Result<()> {
 		let get_dest = || Self::path(paths, nar_info.identity);
 		util::with_file_ctx(|| format!("Writing {}", get_dest().display()), || {
 			let dest = get_dest();
@@ -122,6 +183,7 @@ impl StoreMeta {
 				.with_context(|| format!("Writing {}", tmp_dest.display()))?;
 			let store_meta = StoreMeta {
 				references: nar_info.references.clone(),
+				version,
 			};
 			serde_json::to_writer(file, &store_meta)?;
 			util::rename(tmp_dest, dest)?;
@@ -136,9 +198,9 @@ impl StoreMeta {
 		})
 	}
 
-	pub fn load(paths: &RuntimePaths, identity: &StoreIdentity) -> Result<StoreMetaFull> {
+	pub fn load(paths: &RuntimePaths, identity: &StoreIdentity) -> Result<StoreMetaFull, MetaError> {
 		let p = Self::path(paths, identity);
-		util::with_file_ctx(|| format!("Loading {}", p.display()), || {
+		let meta = util::with_file_ctx(|| format!("Loading {}", p.display()), || {
 			let contents = fs::read_to_string(&p)?;
 			let meta = serde_json::from_str(&contents)?;
 			let used_timestamp = FileTime::from_last_modification_time(&fs::metadata(&p)?);
@@ -146,9 +208,15 @@ impl StoreMeta {
 				meta,
 				used_timestamp
 			})
-		})
-	}
+		})?;
 
+		if meta.is_supported() {
+			Result::Ok(meta)
+		} else {
+			debug!("Cache path exists but version unsupported: {:?}", &p);
+			Err(MetaError::UnsupportedVersion)
+		}
+	}
 }
 
 // Contents of the meta file as well as access time
@@ -163,5 +231,12 @@ pub struct StoreMetaFull {
 impl StoreMetaFull {
 	pub fn references(&self) -> &Vec<StoreIdentity> {
 		&self.meta.references
+	}
+
+	pub fn is_supported(&self) -> bool {
+		match self.meta.version {
+			StoreEntryVersion::Latest => true,
+			StoreEntryVersion::Historical(_) => false,
+		}
 	}
 }
