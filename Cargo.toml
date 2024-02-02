@@ -1,6 +1,7 @@
 [workspace]
 members = [ "cli", "builder" ]
 exclude = ["redhook"]
+resolver = "2"
 
 [profile.release]
 opt-level = "s" # optimize for binary size

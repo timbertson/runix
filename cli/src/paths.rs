@@ -143,7 +143,8 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 		if mode != writeable {
 			debug!("making writeable: {:?}", path.as_ref());
 			perms.set_mode(writeable);
-			fs::set_permissions(path, perms)?;
+			fs::set_permissions(&path, perms)
+				.with_context(|| format!("adding write permissions to {:?}", path.as_ref()))?;
 		}
 		Ok(())
 	}
@@ -162,28 +163,30 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 		if mode != executable {
 			debug!("making executable: {:?}", path);
 			perms.set_mode(executable);
-			fs::set_permissions(path, perms)?;
+			fs::set_permissions(path, perms)
+				.with_context(|| format!("adding execute permissions to {:?}", path.display()))?;
 		}
 		Ok(())
 	}
 
 	pub fn ensure_unwriteable<P: AsRef<Path>>(path: P) -> Result<()> {
 		let path = path.as_ref();
-		let stat = symlink_metadata(path).context("ensure_unwriteable")?;
+		let stat = symlink_metadata(path).context("ensure_unwriteable lstat")?;
 		let mut perms = stat.permissions();
 		let mode = perms.mode();
 		let unwriteable = mode & !0o222;
 		if mode != unwriteable {
 			debug!("making unwriteable: {:?}", path);
 			perms.set_mode(unwriteable);
-			fs::set_permissions(path, perms)?;
+			fs::set_permissions(&path, perms)
+				.with_context(|| format!("removing write permissions from {}", path.display()))?;
 		}
 		Ok(())
 	}
 
 	pub fn rm_recursive<P: AsRef<Path>>(path: P) -> Result<()> {
 		let path = path.as_ref();
-		let stat = symlink_metadata(path).context("rm_recursive")?;
+		let stat = symlink_metadata(path).context("rm_recursive lstat")?;
 		ensure_writeable_stat(path, &stat)?;
 		if stat.is_dir() {
 			for entry in fs::read_dir(path)? {

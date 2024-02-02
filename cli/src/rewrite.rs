@@ -108,6 +108,17 @@ pub fn rewrite_all_recursively<'a, P: AsRef<Path>, R: IntoIterator<Item=&'a Stor
 		Some(x) => x,
 	};
 
+	// first walk (top down): make all directories user-writable
+	for entry in WalkDir::new(src_path).follow_links(false).contents_first(false) {
+		let entry = entry?;
+		let stat = entry.metadata()?;
+		if stat.is_dir() {
+			let path = entry.path();
+			paths::util::ensure_writeable_stat(&path, &stat)?;
+		}
+	}
+
+	// second walk (bottom up): rewrite files and then remove write permissions
 	for entry in WalkDir::new(src_path).follow_links(false).contents_first(true) {
 		let entry = entry?;
 		let path = entry.path();
@@ -119,8 +130,9 @@ pub fn rewrite_all_recursively<'a, P: AsRef<Path>, R: IntoIterator<Item=&'a Stor
 				let file = fs::OpenOptions::new()
 					.read(true)
 					.write(true)
-					.open(&path)?;
-				let mut mmap = unsafe { MmapMut::map_mut(&file)? };
+					.open(&path)
+					.with_context(|| format!("opening {}", path.display()))?;
+				let mut mmap = unsafe { MmapMut::map_mut(&file).context("MmapMut.map_mut")? };
 				rewrite.replace_all(&mut mmap)
 			};
 			if count > 0 {
