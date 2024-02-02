@@ -19,6 +19,7 @@ let
 			libiconv # native libs
 			curl
 			git
+			findutils
 		] ++
 			lib.optionals stdenv.isDarwin (with darwin.apple_sdk; [
 				frameworks.Security

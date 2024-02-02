@@ -51,7 +51,7 @@ pub fn current_platform() -> String {
 pub fn all_platforms() -> Vec<&'static str> {
 	vec!(
 		"x86_64-Linux",
-		"x86_64-Darwin",
+		// "x86_64-Darwin", TODO: https://github.com/timbertson/runix/issues/9
 		"arm64-Darwin",
 	)
 }

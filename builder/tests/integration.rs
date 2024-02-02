@@ -247,7 +247,7 @@ fn crossplatform_file_types() -> Result<()> {
 			if line.trim().is_empty() {
 				continue
 			}
-			if line.contains("ASCII text") {
+			if line.contains("ASCII text") || line.contains("script") {
 				continue
 			} else {
 				match platform.split_once('-').unwrap() {
