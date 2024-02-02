@@ -1,1 +1,1 @@
-./x86_64-Darwin.nix
+./arm64-Darwin.nix
