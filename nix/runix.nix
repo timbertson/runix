@@ -104,7 +104,7 @@ let
 				(fetlockSelf: fetlockSuper: {
 					pkgs = fetlockSuper.pkgs // {
 						buildRustCrate = args: fetlockSuper.pkgs.buildRustCrate (args // {
-							extraRustcOpts =
+							extraRustcOpts = (args.extraRustcOpts or []) ++
 								(lib.optionals
 									(lib.elem args.pname [ "webpki-roots" ] && self.runix.isDarwin)
 									# TODO why isn't it enough to add these to buildInputs?
@@ -118,37 +118,53 @@ let
 				})
 			];
 		};
-
-		recursivelyStripCF = drv:
-			if self.runix.isDarwin then (
+		
+		stripFromClosure = drv: removals:
+			lib.foldl' (drv: { removal, attr ? null }:
 				let
-					realCF = pkgsBuildHost.darwin.CF;
-					emptyCF = pkgsBuildHost.stdenv.mkDerivation {
-						inherit (realCF) name outputs;
-						buildCommand = "mkdir $out";
+					emptyReplacement = pkgsBuildHost.stdenv.mkDerivation {
+						inherit (removal) name outputs;
+						buildCommand = lib.concatMapStrings (outvar: ''
+							echo "creating empty ''${${outvar}}"
+							touch "''${${outvar}}"
+						'') removal.outputs;
+						# "echo $outputs; mkdir $out";
 					};
-					realLibsystem = pkgsBuildHost.darwin.Libsystem;
-					emptyLibsystem = pkgsBuildHost.stdenv.mkDerivation {
-						inherit (realLibsystem) name outputs;
-						buildCommand = "mkdir $out";
+					args = if attr == null then {
+						oldDependency = removal;
+							# lib.trace "removing references to: ${removal.outPath}"
+						newDependency = emptyReplacement;
+					} else {
+						oldDependency = lib.getAttr attr removal;
+						newDependency = lib.getAttr attr emptyReplacement;
 					};
-				in pkgsBuildBuild.replaceDependency {
-					oldDependency = realLibsystem;
-					newDependency = emptyLibsystem;
-					drv = pkgsBuildBuild.replaceDependency {
-						inherit drv;
-						oldDependency = lib.trace "real cf: ${realCF}" (builtins.unsafeDiscardStringContext realCF);
-						newDependency = emptyCF;
-					};
-				}
-			) else drv;
+				in
+
+				lib.trace "removing references to: ${args.oldDependency.outPath}" (
+					pkgsBuildBuild.replaceDependency (args // { inherit drv; })
+				)
+			) drv removals;
+
+		stripUnwantedDependencies = drv:
+			# NOTE: order is important. We strip `ring` _before_ libsystem.
+			# Otherwise, since ring depends on libsystem then `ring` (what we pass) is
+			# ring(realLibsystem) but the derivation we'd be stripping
+			# has alcreay removed libsystem; i.e it only depends on ring(fakeLibsystem)
+			stripFromClosure drv ([
+				{ removal = selection.drvsByName.ring; attr = "lib"; }
+			] ++ lib.optionals isDarwin (with pkgsBuildHost.darwin;
+				[ { removal = Libsystem; } { removal = CF; } ]
+			));
+
 	in {
 		inherit fenix-rust;
 		rustc = self.fenix-rust;
 		runix-extractors = extractors;
 		runix = {
 			inherit makeSelection selection root commonPkgOverrides isDarwin;
-			cli = recursivelyStripCF self.runix.selection.drvsByName.runix;
+			cli = lib.extendDerivation true {
+				inherit selection;
+			} (stripUnwantedDependencies selection.drvsByName.runix);
 			builder = self.runix.selection.drvsByName.runix-build;
 			tests = self.runix.selection.drvsByName.runix-build.override (_: {
 				buildTests = true;
@@ -197,7 +213,7 @@ EOF
 					pkgs = fetlockSuper.pkgs // {
 						buildRustCrate = args: fetlockSuper.pkgs.buildRustCrate (args // {
 							preConfigure = preconfigureIconvHack;
-							extraRustcOpts =
+							extraRustcOpts = (args.extraRustcOpts or []) ++
 								(lib.optionals
 									(lib.elem args.pname [ "runix" "webpki-roots" ])
 									[ "-C" "linker=${self.stdenv.cc}/bin/${self.stdenv.cc.targetPrefix}ld" ]
